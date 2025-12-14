@@ -139,7 +139,7 @@ case $c in
  3) bash <(curl -s https://raw.githubusercontent.com/nobita54/-150/refs/heads/main/Uninstall/unwings.sh) ;;
  4) tools_menu ;;
  5) theme_menu ;;
- 6) bash <(curl -s https://raw.githubusercontent.com/nobita54/-150/refs/heads/main/thame/ss.sh) ;;
+ 6) bash <(curl -s https://github.com/nobita329/The-Coding-Hub/raw/refs/heads/main/srv/menu/System1.sh) ;;
  7) echo -e "${GREEN}Exiting — CODING HUB by Nobita${NC}"; exit ;;
  *) echo -e "${RED}Invalid${NC}"; pause ;;
 esac
