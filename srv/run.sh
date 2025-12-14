@@ -1,4 +1,3 @@
-Hey can you help me with this, how to you make this?
 #!/usr/bin/env bash
 # .netrc → curl --netrc → download & execute remote script
 set -euo pipefail
