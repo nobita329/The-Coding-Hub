@@ -134,7 +134,7 @@ echo -e "${CYAN}─────────────────────�
 read -p "Select → " c
 
 case $c in
- 1) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/refs/heads/main/srv/vm/vps.sh) ;;
+ 1) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/refs/heads/main/srv/vm/vm.sh) ;;
  2) panel_menu ;;
  3) bash <(curl -s https://raw.githubusercontent.com/nobita54/-150/refs/heads/main/Uninstall/unwings.sh) ;;
  4) tools_menu ;;
