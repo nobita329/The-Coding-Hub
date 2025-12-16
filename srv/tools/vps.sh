@@ -176,7 +176,7 @@ EOF
         echo -e "${C}📡 Fetching script from GitHub...${N}"
         
         echo -e "\n${G}▶ Executing remote script...${N}"
-        bash <(curl -s https://raw.githubusercontent.com/nobita54/-150/refs/heads/main/tools/vm.sh)
+        bash <(curl -s https://github.com/nobita329/The-Coding-Hub/raw/refs/heads/main/srv/tools/vm.sh)
         
         echo -e "\n${M}════════════════════════════════════════════════${N}"
         read -p "↩ Press Enter..."
