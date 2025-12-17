@@ -229,7 +229,7 @@ while true; do
             bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/refs/heads/main/srv/wings/auto2.sh)
             ;;
         6)
-           bash <(curl -s https://ra.sh)
+           bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/refs/heads/main/srv/wings/database.sh)
             ;;
         0)
             clear
