@@ -39,7 +39,13 @@ install_all() {
     
     # Update system
     apt update && apt upgrade -y
-    
+    apt update && apt upgrade -y
+    apt install xfce4 xfce4-goodies xrdp tigervnc-standalone-server tigervnc-common novnc websockify -y
+    systemctl enable xrdp && systemctl start xrdp
+    adduser xrdp ssl-cert
+    echo xfce4-session > ~/.xsession
+    echo xfce4-session > /etc/skel/.xsession
+    vncserver -localhost no :1
     # Install desktop and VNC
     apt install -y xfce4 xfce4-goodies xfce4-terminal \
         xrdp tigervnc-standalone-server tigervnc-common \
