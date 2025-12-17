@@ -115,150 +115,6 @@ public_ip_setup() {
     
     echo -e "\n\n${VL}${G}✓ SSL certificate installed for ${W}$DOMAIN${N}"
     
-    # ---------------------------
-    # Step 3: Database Configuration
-    # ---------------------------
-    echo -e "\n${VL}${Y}💾 STEP 3: Database Configuration${N}"
-    echo -e "${VL}${W}══════════════════════════════════════════════════════════${N}"
-    
-    echo -e "${VL}${C}Enter MariaDB Details (Press Enter for defaults):${N}"
-    echo -e "${VL}${W}══════════════════════════════════════════════════════════${N}"
-    
-    echo -ne "${VL}${W}Database Name [root]: ${N}"
-    read DB_NAME
-    DB_NAME=${DB_NAME:-root}
-    
-    echo -ne "${VL}${W}Database User [root]: ${N}"
-    read DB_USER
-    DB_USER=${DB_USER:-root}
-    
-    echo -ne "${VL}${W}Database Password [root]: ${N}"
-    read DB_PASS
-    DB_PASS=${DB_PASS:-root}
-    
-    echo -e "\n${VL}${Y}Using: DB=${W}$DB_NAME${Y}, USER=${W}$DB_USER${Y}, PASS=${W}$DB_PASS${N}"
-    
-    show_progress_bar 6 10 "Creating database and user..."
-    mysql -e "CREATE USER IF NOT EXISTS '${DB_USER}'@'127.0.0.1' IDENTIFIED BY '${DB_PASS}';" > /dev/null 2>&1
-    mysql -e "CREATE DATABASE IF NOT EXISTS ${DB_NAME};" > /dev/null 2>&1
-    mysql -e "GRANT ALL PRIVILEGES ON ${DB_NAME}.* TO '${DB_USER}'@'127.0.0.1' WITH GRANT OPTION;" > /dev/null 2>&1
-    mysql -e "FLUSH PRIVILEGES;" > /dev/null 2>&1
-    
-    echo -e "\n\n${VL}${G}✓ MariaDB configured successfully!${N}"
-    
-    # ---------------------------
-    # Step 4: Bind-address Fix
-    # ---------------------------
-    echo -e "\n${VL}${Y}⚙️  STEP 4: Network Configuration${N}"
-    echo -e "${VL}${W}══════════════════════════════════════════════════════════${N}"
-    
-    show_progress_bar 7 10 "Configuring bind-address..."
-    CONF_FILE="/etc/mysql/mariadb.conf.d/50-server.cnf"
-    
-    if [ -f "$CONF_FILE" ]; then
-        sed -i 's/^bind-address.*/bind-address = 0.0.0.0/' "$CONF_FILE"
-        echo -e "\n${VL}${G}✓ Bind-address set to 0.0.0.0${N}"
-    else
-        echo -e "\n${VL}${Y}⚠ Config file not found, skipping bind-address update${N}"
-    fi
-    
-    systemctl restart mysql 2>/dev/null
-    systemctl restart mariadb 2>/dev/null
-    
-    # ---------------------------
-    # Confirmation
-    # ---------------------------
-    echo -e "\n${VL}${Y}⚠️  INSTALLATION CONFIRMATION${N}"
-    echo -e "${VL}${W}══════════════════════════════════════════════════════════${N}"
-    echo -e "${VL}${W}Ready to install:${N}"
-    echo -e "${VL}${W}  • Docker${N}"
-    echo -e "${VL}${W}  • Pterodactyl Wings${N}"
-    echo -e "${VL}${W}  • GRUB Configuration${N}"
-    echo -e "${VL}${W}══════════════════════════════════════════════════════════${N}"
-    
-    echo -ne "${VL}${C}Proceed with Docker & Wings installation? (y/n): ${N}"
-    read YES
-    
-    if [[ "$YES" != "y" ]] && [[ "$YES" != "Y" ]]; then
-        echo -e "\n${VL}${R}❌ Installation cancelled by user.${N}"
-        echo -e "${BL}════════════════════════════════════════════════════════════${BR}${N}"
-        read -p "Press Enter to continue..."
-        return
-    fi
-    
-    # ---------------------------
-    # Step 5: Docker Install
-    # ---------------------------
-    echo -e "\n${VL}${Y}🐳 STEP 5: Docker Installation${N}"
-    echo -e "${VL}${W}══════════════════════════════════════════════════════════${N}"
-    
-    show_progress_bar 8 10 "Installing Docker..."
-    curl -sSL https://get.docker.com/ | CHANNEL=stable bash > /dev/null 2>&1
-    systemctl enable --now docker > /dev/null 2>&1
-    
-    # ---------------------------
-    # Step 6: GRUB Fix
-    # ---------------------------
-    echo -e "\n${VL}${Y}⚙️  STEP 6: GRUB Configuration${N}"
-    echo -e "${VL}${W}══════════════════════════════════════════════════════════${N}"
-    
-    show_progress_bar 9 10 "Updating GRUB..."
-    sed -i 's/^GRUB_CMDLINE_LINUX_DEFAULT=.*/GRUB_CMDLINE_LINUX_DEFAULT="swapaccount=1"/' /etc/default/grub
-    update-grub > /dev/null 2>&1
-    
-    # ---------------------------
-    # Step 7: Wings Install
-    # ---------------------------
-    echo -e "\n${VL}${Y}🦅 STEP 7: Pterodactyl Wings Installation${N}"
-    echo -e "${VL}${W}══════════════════════════════════════════════════════════${N}"
-    
-    show_progress_bar 10 10 "Installing Wings..."
-    mkdir -p /etc/pterodactyl
-    
-    ARCH=$(uname -m)
-    if [ "$ARCH" == "x86_64" ]; then 
-        ARCH="amd64"
-    else 
-        ARCH="arm64"
-    fi
-    
-    curl -L -o /usr/local/bin/wings "https://github.com/pterodactyl/wings/releases/latest/download/wings_linux_$ARCH" > /dev/null 2>&1
-    chmod u+x /usr/local/bin/wings
-    
-    # Wings service
-    cat <<EOF > /etc/systemd/system/wings.service
-[Unit]
-Description=Pterodactyl Wings Daemon
-After=docker.service
-Requires=docker.service
-
-[Service]
-User=root
-WorkingDirectory=/etc/pterodactyl
-ExecStart=/usr/local/bin/wings
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-    systemctl daemon-reload
-    systemctl enable wings > /dev/null 2>&1
-    
-    echo -e "\n\n${VL}${G}✅ INSTALLATION COMPLETE!${N}"
-    echo -e "${VL}${W}══════════════════════════════════════════════════════════${N}"
-    echo -e "${VL}${G}✓ Domain: ${W}$DOMAIN${N}"
-    echo -e "${VL}${G}✓ Database: ${W}$DB_NAME${N}"
-    echo -e "${VL}${G}✓ Public IP: ${W}$PUBLIC_IP${N}"
-    echo -e "${VL}${G}✓ Docker: ${W}Installed & Running${N}"
-    echo -e "${VL}${G}✓ Wings: ${W}Installed & Enabled${N}"
-    echo -e "${VL}${G}✓ SSL Certificate: ${W}Installed${N}"
-    echo -e "\n${VL}${Y}📋 Next Steps:${N}"
-    echo -e "${VL}${W}1. Configure your panel to connect to this node${N}"
-    echo -e "${VL}${W}2. Start Wings service: ${C}systemctl start wings${N}"
-    echo -e "${VL}${W}3. Check status: ${C}systemctl status wings${N}"
-    echo -e "${BL}════════════════════════════════════════════════════════════${BR}${N}\n"
-    
     read -p "Press Enter to return to menu..."
 }
 
@@ -362,6 +218,10 @@ while true; do
             ;;
         3)
             uninstall_wings
+            ;;
+        4)  
+            ;;
+        5)  
             ;;
         0)
             clear
