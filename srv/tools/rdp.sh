@@ -108,7 +108,10 @@ EOF
     systemctl daemon-reload
     systemctl enable novnc
     systemctl start novnc
-    
+    systemctl daemon-reexec
+    systemctl daemon-reload
+    systemctl enable novnc
+    systemctl start novnc
     # Configure firewall
     ufw allow 3389/tcp
     ufw allow 6080/tcp
