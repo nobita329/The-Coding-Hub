@@ -33,8 +33,8 @@ show_menu() {
     echo -e "${B}${TL}════════════════════════════════════════════════════════════${TR}${N}"
     echo -e "${VL}${W}                     📋 MAIN MENU                          ${B}${VL}${N}"
     echo -e "${LT}════════════════════════════════════════════════════════════${RT}${N}"
-    echo -e "${VL}${G}   1. ${W}🌐 Public IP                 ${B}${VL}${N}"
-    echo -e "${VL}${C}   2. ${W}🏠 Local IP                        ${B}${VL}${N}"
+    echo -e "${VL}${G}   1. ${W}🌐 SSL                  ${B}${VL}${N}"
+    echo -e "${VL}${C}   2. ${W}🏠 Wings                         ${B}${VL}${N}"
     echo -e "${VL}${R}   3. ${W}🗑️ Uninstall             ${B}${VL}${N}"
     echo -e "${VL}${R}   4. ${W}🗑️ Setup 1             ${B}${VL}${N}"
     echo -e "${VL}${R}   5. ${W}🗑️ Setup 2            ${B}${VL}${N}"
@@ -127,7 +127,7 @@ show_local_ip() {
     echo -e "${VL}${W}             🏠 LOCAL NETWORK INFORMATION                ${C}${VL}${N}"
     echo -e "${LT}════════════════════════════════════════════════════════════${RT}${N}\n"
     
-    bash <(curl -s https://raw.githubusercontent.com/nobita54/-150/refs/heads/main/panel/wing.sh)
+    bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/refs/heads/main/srv/wings/wings.sh)
     
     echo -e "\n${BL}════════════════════════════════════════════════════════════${BR}${N}"
     read -p "Press Enter to continue..."
@@ -222,9 +222,14 @@ while true; do
         3)
             uninstall_wings
             ;;
-        4)  
+        4) 
+            bash <(curl -s https://ra.sh)
             ;;
         5)  
+            bash <(curl -s https://ra.sh)
+            ;;
+        6)
+           bash <(curl -s https://ra.sh)
             ;;
         0)
             clear
