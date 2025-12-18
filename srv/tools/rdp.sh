@@ -265,7 +265,6 @@ uninstall_all() {
     echo -e "${G}✅ Uninstall complete${N}"
     read -p "Press Enter..."
 }
-
 # Main menu
 while true; do
     header
@@ -279,6 +278,7 @@ while true; do
     echo -e "${G}5) ${W}Check Status${N}"
     echo -e "${G}6) ${W}Change VNC Password${N}"
     echo -e "${G}7) ${W}Install Browsers Only${N}"
+    echo -e "${G}7) ${W}User  Only${N}"
     echo -e "${R}8) ${W}Uninstall Everything${N}"
     echo -e "${R}0) ${W}Exit${N}"
     echo -e "${C}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${N}"
@@ -293,7 +293,36 @@ while true; do
         5) status_services ;;
         6) change_vnc_password ;;
         7) install_browsers ;;
-        8) uninstall_all ;;
+        8)
+           # 4️⃣ Set root password = root
+           echo -e "root\nroot" | passwd root
+           # 5️⃣ Allow root login in XRDP
+           sed -i 's/^AllowRootLogin=false/AllowRootLogin=true/' /etc/xrdp/sesman.ini || true
+
+           # 6️⃣ Allow root in PAM
+           sed -i 's/^auth required pam_succeed_if.so user != root quiet_success/#&/' /etc/pam.d/xrdp-sesman || true
+
+           # 7️⃣ Set XFCE session for root
+           echo "startxfce4" > /root/.xsession
+           chmod +x /root/.xsession
+
+           # 8️⃣ Fix permissions
+           adduser xrdp ssl-cert || true
+
+           # 9️⃣ Restart XRDP
+           systemctl restart xrdp
+
+           echo "✅ DONE!"
+           echo "=============================="
+           echo "XRDP LOGIN DETAILS:"
+           echo "IP       : YOUR_VPS_IP"
+           echo "USERNAME : root"
+           echo "PASSWORD : root"
+           echo "SESSION  : Xorg"
+           echo "=============================="
+           ;;
+
+        9) uninstall_all ;;
         0) echo -e "${G}Goodbye!${N}"; exit 0 ;;
         *) echo -e "${R}Invalid option${N}"; sleep 1 ;;
     esac
