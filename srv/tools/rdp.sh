@@ -271,7 +271,7 @@ while true; do
     show_info
     
     echo -e "${C}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${N}"
-    echo -e "${G}1) ${W}Install RDP + noVNC + Browsers${N}"
+    echo -e "${G}1) ${W}Install${N}"
     echo -e "${G}2) ${W}Start ${N}"
     echo -e "${G}3) ${W}Stop ${N}"
     echo -e "${G}4) ${W}Restart ${N}"
