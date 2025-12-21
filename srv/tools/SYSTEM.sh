@@ -1,12 +1,20 @@
 #!/bin/bash
 
 # =============== COLORS ===============
-R="\e[31m"; G="\e[32m"; Y="\e[33m"; B="\e[34m"; C="\e[36m"; N="\e[0m"
+R="\e[31m"; G="\e[32m"; Y="\e[33m"; B="\e[34m"; C="\e[36m"; M="\e[35m"; W="\e[37m"; N="\e[0m"
 
 # =============== HELPERS ===============
 pause() {
     echo
     read -p "↩ Press Enter to return to menu..." _
+}
+
+header() {
+    clear
+    echo -e "${C}"
+    echo "╔══════════════════════════════════════════════════════════╗"
+    echo "║                 VPS ANALYZER PRO UI v2.0                 ║"
+    echo "╚══════════════════════════════════════════════════════════╝${N}"
 }
 
 # =============== SPEEDTEST ===============
@@ -120,14 +128,199 @@ btop_live() {
     done
 }
 
-# =============== MAIN MENU (OLD UI) ===============
-while true; do
-    clear
-    echo -e "${C}"
-    echo "╔════════════════════════════════════════════════╗"
-    echo "║                VPS ANALYZER PRO UI              ║"
-    echo "╚════════════════════════════════════════════════╝${N}"
+# =============== NEW FEATURES ===============
 
+# 12) SERVICE MONITOR
+service_monitor() {
+    clear
+    echo -e "${M}🔧 SERVICE STATUS MONITOR${N}"
+    echo
+    echo -e "${Y}1) List all services${N}"
+    echo -e "${Y}2) Check specific service${N}"
+    echo -e "${Y}3) Start/Stop service${N}"
+    echo -e "${Y}4) Enable/Disable at boot${N}"
+    echo
+    read -p "Choose option [1-4]: " service_opt
+    
+    case $service_opt in
+        1)
+            systemctl list-units --type=service --no-pager | head -30
+            ;;
+        2)
+            read -p "Enter service name (e.g., nginx, sshd): " svc_name
+            systemctl status "$svc_name" --no-pager
+            ;;
+        3)
+            read -p "Service name: " svc_name
+            echo -e "${Y}1) Start${N}"
+            echo -e "${Y}2) Stop${N}"
+            echo -e "${Y}3) Restart${N}"
+            read -p "Action [1-3]: " action
+            case $action in
+                1) sudo systemctl start "$svc_name" ;;
+                2) sudo systemctl stop "$svc_name" ;;
+                3) sudo systemctl restart "$svc_name" ;;
+                *) echo "Invalid option" ;;
+            esac
+            systemctl status "$svc_name" --no-pager | head -10
+            ;;
+        4)
+            read -p "Service name: " svc_name
+            echo -e "${Y}1) Enable at boot${N}"
+            echo -e "${Y}2) Disable at boot${N}"
+            read -p "Action [1-2]: " action
+            case $action in
+                1) sudo systemctl enable "$svc_name" ;;
+                2) sudo systemctl disable "$svc_name" ;;
+                *) echo "Invalid option" ;;
+            esac
+            ;;
+        *)
+            echo "Invalid option"
+            ;;
+    esac
+    pause
+}
+
+# 13) SECURITY AUDIT
+security_audit() {
+    clear
+    echo -e "${R}🔐 SECURITY AUDIT${N}"
+    echo
+    echo -e "${Y}🛡️ SSH Security Check:${N}"
+    grep -E "^PermitRootLogin" /etc/ssh/sshd_config 2>/dev/null || echo "PermitRootLogin not found"
+    grep -E "^PasswordAuthentication" /etc/ssh/sshd_config 2>/dev/null || echo "PasswordAuthentication not found"
+    
+    echo -e "\n${Y}🔍 Failed Login Attempts:${N}"
+    lastb | head -10
+    
+    echo -e "\n${Y}👥 Users with sudo:${N}"
+    grep -Po '^sudo.+:\K.*$' /etc/group | tr ',' '\n'
+    
+    echo -e "\n${Y}🔐 Open Ports:${N}"
+    ss -tuln | grep LISTEN
+    
+    pause
+}
+
+# 14) BACKUP MANAGER
+backup_manager() {
+    clear
+    echo -e "${G}💾 BACKUP MANAGER${N}"
+    echo
+    echo -e "${Y}1) Quick backup (home directory)${N}"
+    echo -e "${Y}2) Backup specific folder${N}"
+    echo -e "${Y}3) Schedule automatic backup${N}"
+    echo -e "${Y}4) List backup files${N}"
+    echo
+    read -p "Choose option [1-4]: " backup_opt
+    
+    case $backup_opt in
+        1)
+            backup_file="backup_home_$(date +%Y%m%d_%H%M%S).tar.gz"
+            echo -e "${C}Creating backup of /home to ~/$backup_file${N}"
+            tar -czf ~/"$backup_file" /home 2>/dev/null
+            echo -e "${G}Backup created: ~/$backup_file${N}"
+            du -h ~/"$backup_file" | awk '{print "Size:", $1}'
+            ;;
+        2)
+            read -p "Enter folder path to backup: " folder_path
+            if [ -d "$folder_path" ]; then
+                folder_name=$(basename "$folder_path")
+                backup_file="backup_${folder_name}_$(date +%Y%m%d_%H%M%S).tar.gz"
+                tar -czf ~/"$backup_file" "$folder_path" 2>/dev/null
+                echo -e "${G}Backup created: ~/$backup_file${N}"
+            else
+                echo -e "${R}Folder not found!${N}"
+            fi
+            ;;
+        3)
+            echo -e "${Y}Coming soon... Use cron for scheduling${N}"
+            ;;
+        4)
+            echo -e "${C}Backup files in home directory:${N}"
+            ls -lh ~/backup_* 2>/dev/null || echo "No backup files found"
+            ;;
+        *)
+            echo "Invalid option"
+            ;;
+    esac
+    pause
+}
+
+# 15) DOCKER MONITOR
+docker_monitor() {
+    clear
+    echo -e "${B}🐳 DOCKER MONITOR${N}"
+    
+    if ! command -v docker &>/dev/null; then
+        echo -e "${R}Docker is not installed${N}"
+        echo -e "Install with: ${Y}sudo apt install docker.io -y${N}"
+        pause
+        return
+    fi
+    
+    echo -e "${Y}1) List containers${N}"
+    echo -e "${Y}2) List images${N}"
+    echo -e "${Y}3) Container stats${N}"
+    echo -e "${Y}4) Docker disk usage${N}"
+    echo
+    read -p "Choose option [1-4]: " docker_opt
+    
+    case $docker_opt in
+        1)
+            echo -e "${C}Running containers:${N}"
+            docker ps
+            echo -e "\n${C}All containers:${N}"
+            docker ps -a
+            ;;
+        2)
+            docker images
+            ;;
+        3)
+            docker stats --no-stream
+            ;;
+        4)
+            docker system df
+            ;;
+        *)
+            echo "Invalid option"
+            ;;
+    esac
+    pause
+}
+
+# 16) PERFORMANCE BENCHMARK
+performance_benchmark() {
+    clear
+    echo -e "${Y}📊 PERFORMANCE BENCHMARK${N}"
+    
+    echo -e "${C}Running CPU benchmark (30 seconds)...${N}"
+    echo -e "CPU BogoMips: $(grep -i bogomips /proc/cpuinfo | head -1 | awk -F: '{print $2}')"
+    
+    # Simple CPU test
+    echo -e "\n${Y}CPU Test (calculating π):${N}"
+    time echo "scale=5000; 4*a(1)" | bc -l 2>&1 | tail -3
+    
+    # Disk speed test
+    echo -e "\n${Y}Disk Write Speed:${N}"
+    dd if=/dev/zero of=/tmp/testfile bs=1M count=100 2>&1 | tail -1
+    rm -f /tmp/testfile
+    
+    # Memory speed test
+    echo -e "\n${Y}Memory Speed:${N}"
+    if command -v sysbench &>/dev/null; then
+        sysbench memory --memory-block-size=1M --memory-total-size=1G run 2>/dev/null | grep -E "transferred|seconds"
+    else
+        echo "Install sysbench for detailed memory test"
+    fi
+    
+    pause
+}
+
+# =============== MAIN MENU (UPDATED UI) ===============
+while true; do
+    header
     echo -e "
  ${G}╔═══════════════╗    ${Y}╔═══════════════╗    ${B}╔═══════════════╗
  ${G}║ 1) System Info║    ${Y}║ 2) Disk+RAM   ║    ${B}║ 3) Network     ║
@@ -140,6 +333,14 @@ while true; do
  ${B}╔═══════════════╗    ${G}╔════════════════╗    ${R}╔═══════════════╗
  ${B}║ 7) SpeedTest  ║    ${G}║ 8) Logs Viewer ║    ${R}║ 9) Temp Monitor║
  ${B}╚═══════════════╝    ${G}╚════════════════╝    ${R}╚═══════════════╝
+
+ ${M}╔═══════════════╗    ${C}╔════════════════╗    ${G}╔═══════════════╗
+ ${M}║12) Services   ║    ${C}║13) Security    ║    ${G}║14) Backup      ║
+ ${M}╚═══════════════╝    ${C}╚════════════════╝    ${G}╚═══════════════╝
+
+ ${B}╔═══════════════╗    ${Y}╔════════════════╗    ${R}╔═══════════════╗
+ ${B}║15) Docker     ║    ${Y}║16) Performance ║    ${R}║17) Update Tool ║
+ ${B}╚═══════════════╝    ${Y}╚════════════════╝    ${R}╚═══════════════╝
 
                     ${Y}╔═════════════════════╗
                     ${Y}║10) DDOS/Abuse Check ║
@@ -220,6 +421,28 @@ while true; do
             clear
             echo -e "${Y}Exiting VPS Analyzer Pro. Bye!${N}"
             exit 0
+            ;;
+        12)
+            service_monitor
+            ;;
+        13)
+            security_audit
+            ;;
+        14)
+            backup_manager
+            ;;
+        15)
+            docker_monitor
+            ;;
+        16)
+            performance_benchmark
+            ;;
+        17)
+            clear
+            echo -e "${C}🔄 UPDATING VPS ANALYZER PRO${N}"
+            echo "This would update the tool from GitHub..."
+            echo "Update feature placeholder"
+            pause
             ;;
         *)
             echo "Invalid option"; sleep 1 ;;
