@@ -20,7 +20,7 @@ read -rp "Enter Database Username: " DB_USER
 read -rp "Enter Database Password: " DB_PASS
 
 echo -e "${YELLOW}⚙️ Creating database user...${NC}"
-
+sudo apt update && sudo apt install -y mysql-server mongodb && sudo systemctl enable --now mysql mongodb
 # ===== MySQL (NO PASSWORD, NO PROMPT) =====
 sudo mysql <<MYSQL_SCRIPT
 CREATE USER IF NOT EXISTS '${DB_USER}'@'%' IDENTIFIED BY '${DB_PASS}';
