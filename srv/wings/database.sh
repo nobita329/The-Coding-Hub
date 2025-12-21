@@ -16,8 +16,14 @@ echo -e "${BLUE}
 ${NC}"
 
 # ===== Input =====
-read -rp "Enter Database Username: " DB_USER
-read -rp "Enter Database Password: " DB_PASS
+read -rp "Enter Database Username [default: root]: " DB_USER
+read -rp "Enter Database Password [default: root]: " DB_PASS
+
+# Set defaults if empty
+DB_USER=${DB_USER:-root}
+DB_PASS=${DB_PASS:-root}
+
+echo -e "${YELLOW}⚙️ Using DB User: ${DB_USER}${NC}"
 
 echo -e "${YELLOW}⚙️ Creating database user...${NC}"
 sudo apt update && apt -y install mariadb-server mariadb-client
