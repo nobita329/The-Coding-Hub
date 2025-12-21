@@ -1,830 +1,1143 @@
 #!/bin/bash
+set -euo pipefail
 
-# Colors
-G="\e[32m"; R="\e[31m"; Y="\e[33m"; C="\e[36m"; W="\e[97m"; B="\e[34m"; M="\e[35m"; N="\e[0m"
+# =============================
+# Docker Container Manager
+# =============================
 
-# Function to print section headers
-section() {
-    echo -e "\n${B}════════════ $1 ════════════${N}"
+# Function to display header
+display_header() {
+    clear
+    cat << "EOF"
+██████╗  ██████╗  ██████╗██╗  ██╗███████╗██████╗ 
+██╔══██╗██╔═══██╗██╔════╝██║ ██╔╝██╔════╝██╔══██╗
+██║  ██║██║   ██║██║     █████╔╝ █████╗  ██████╔╝
+██║  ██║██║   ██║██║     ██╔═██╗ ██╔══╝  ██╔══██╗
+██████╔╝╚██████╔╝╚██████╗██║  ██╗███████╗██║  ██║
+╚═════╝  ╚═════╝  ╚═════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝
+            Container Management System
+EOF
+    echo
 }
 
-# Function to print status messages
-status() {
-    echo -e "${C}[*]${N} $1"
-}
-
-success() {
-    echo -e "${G}[✓]${N} $1"
-}
-
-error() {
-    echo -e "${R}[✗]${N} $1"
-}
-
-warning() {
-    echo -e "${Y}[!]${N} $1"
-}
-
-# Root check
-[ "$EUID" -ne 0 ] && echo -e "${R}Run as root${N}" && exit 1
-
-# All supported distributions with their init systems
-declare -A DISTRO_IMAGES=(
-    # Ubuntu/Debian family (use systemd image or custom)
-    ["ubuntu:latest"]="Ubuntu Latest (no systemd)"
-    ["ubuntu:22.04"]="Ubuntu 22.04 Jammy (no systemd)"
-    ["ubuntu:20.04"]="Ubuntu 20.04 Focal (no systemd)"
-    ["ubuntu:18.04"]="Ubuntu 18.04 Bionic (no systemd)"
-    ["debian:latest"]="Debian Latest (no systemd)"
-    ["debian:11"]="Debian 11 Bullseye (no systemd)"
-    ["debian:10"]="Debian 10 Buster (no systemd)"
+# Function to display colored output with emojis
+print_status() {
+    local type=$1
+    local message=$2
     
-    # Systemd-enabled images
-    ["ubuntu:jammy"]="Ubuntu 22.04 with systemd"
-    ["debian:bullseye"]="Debian 11 with systemd"
-    ["centos:7"]="CentOS 7 with systemd"
-    ["rockylinux:8"]="Rocky Linux 8 with systemd"
-    ["fedora:latest"]="Fedora Latest with systemd"
-    ["archlinux:latest"]="Arch Linux with systemd"
-)
+    case $type in
+        "INFO") echo -e "\033[1;34m📋 [INFO]\033[0m $message" ;;
+        "WARN") echo -e "\033[1;33m⚠️  [WARN]\033[0m $message" ;;
+        "ERROR") echo -e "\033[1;31m❌ [ERROR]\033[0m $message" ;;
+        "SUCCESS") echo -e "\033[1;32m✅ [SUCCESS]\033[0m $message" ;;
+        "INPUT") echo -e "\033[1;36m🎯 [INPUT]\033[0m $message" ;;
+        *) echo "[$type] $message" ;;
+    esac
+}
 
-# Systemd-enabled images (for auto-detection)
-SYSTEMD_IMAGES=(
-    "ubuntu:jammy"
-    "debian:bullseye" 
-    "centos:7"
-    "rockylinux:8"
-    "rockylinux:9"
-    "almalinux:8"
-    "almalinux:9"
-    "fedora:latest"
-    "fedora:38"
-    "fedora:37"
-    "archlinux:latest"
-    "opensuse/leap:latest"
-    "opensuse/tumbleweed:latest"
-    "oraclelinux:8"
-    "oraclelinux:9"
-    "amazonlinux:2023"
-    "amazonlinux:2"
-)
+# Function to check dependencies
+check_dependencies() {
+    if ! command -v docker &> /dev/null; then
+        print_status "ERROR" "🔧 Docker is not installed"
+        print_status "INFO" "💡 To install Docker on Ubuntu/Debian:"
+        echo "    curl -fsSL https://get.docker.com -o get-docker.sh"
+        echo "    sudo sh get-docker.sh"
+        echo "    sudo usermod -aG docker \$USER"
+        exit 1
+    fi
+    
+    # Check if user is in docker group
+    if ! groups | grep -q docker; then
+        print_status "WARN" "👤 Current user is not in docker group"
+        print_status "INFO" "💡 Run: sudo usermod -aG docker \$USER"
+        print_status "INFO" "💡 Then logout and login again"
+    fi
+}
 
-# Default configuration
-DEFAULT_IMAGE="ubuntu:jammy"
-DEFAULT_PREFIX="sys_container"
-DEFAULT_RAM="2g"
-DEFAULT_CPU="1"
-DEFAULT_SSD="20g"
-DEFAULT_IPV4="auto"
-DEFAULT_IPV6="auto"
+# Function to get all container configurations
+get_container_list() {
+    find "$CONTAINER_DIR" -name "*.conf" -exec basename {} .conf \; 2>/dev/null | sort
+}
 
-# Check if image has systemd
-has_systemd() {
-    local image=$1
-    for sysd_img in "${SYSTEMD_IMAGES[@]}"; do
-        if [[ "$image" == "$sysd_img" ]]; then
-            return 0
+# Function to load container configuration
+load_container_config() {
+    local container_name=$1
+    local config_file="$CONTAINER_DIR/$container_name.conf"
+    
+    if [[ -f "$config_file" ]]; then
+        # Clear previous variables
+        unset CONTAINER_NAME IMAGE_NAME CONTAINER_TYPE MEMORY CPUS STORAGE 
+        unset NETWORK_MODE IPV4_ADDRESS IPV6_ADDRESS PORTS VOLUMES ENV_VARS
+        unset CREATED_STATUS
+        
+        source "$config_file"
+        return 0
+    else
+        print_status "ERROR" "📂 Configuration for container '$container_name' not found"
+        return 1
+    fi
+}
+
+# Function to save container configuration
+save_container_config() {
+    local config_file="$CONTAINER_DIR/$CONTAINER_NAME.conf"
+    
+    cat > "$config_file" <<EOF
+CONTAINER_NAME="$CONTAINER_NAME"
+IMAGE_NAME="$IMAGE_NAME"
+CONTAINER_TYPE="$CONTAINER_TYPE"
+MEMORY="$MEMORY"
+CPUS="$CPUS"
+STORAGE="$STORAGE"
+NETWORK_MODE="$NETWORK_MODE"
+IPV4_ADDRESS="$IPV4_ADDRESS"
+IPV6_ADDRESS="$IPV6_ADDRESS"
+PORTS="$PORTS"
+VOLUMES="$VOLUMES"
+ENV_VARS="$ENV_VARS"
+CREATED="$CREATED"
+STATUS="$STATUS"
+EOF
+    
+    print_status "SUCCESS" "💾 Configuration saved to $config_file"
+}
+
+# Function to validate input
+validate_input() {
+    local type=$1
+    local value=$2
+    
+    case $type in
+        "number")
+            if ! [[ "$value" =~ ^[0-9]+$ ]]; then
+                print_status "ERROR" "❌ Must be a number"
+                return 1
+            fi
+            ;;
+        "size")
+            if ! [[ "$value" =~ ^[0-9]+[GgMm]$ ]]; then
+                print_status "ERROR" "❌ Must be a size with unit (e.g., 100G, 512M)"
+                return 1
+            fi
+            ;;
+        "port")
+            if ! [[ "$value" =~ ^[0-9]+$ ]] || [ "$value" -lt 1 ] || [ "$value" -gt 65535 ]; then
+                print_status "ERROR" "❌ Must be a valid port number (1-65535)"
+                return 1
+            fi
+            ;;
+        "name")
+            if ! [[ "$value" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]+$ ]]; then
+                print_status "ERROR" "❌ Container name can only contain letters, numbers, dots, hyphens, and underscores"
+                return 1
+            fi
+            ;;
+        "ipv4")
+            if ! [[ "$value" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || [[ "$value" == "0.0.0.0" ]] || [[ "$value" == "auto" ]]; then
+                if [[ "$value" != "auto" ]]; then
+                    print_status "ERROR" "❌ Must be a valid IPv4 address or 'auto'"
+                    return 1
+                fi
+            fi
+            ;;
+        "ipv6")
+            if [[ -n "$value" ]] && [[ "$value" != "auto" ]]; then
+                print_status "ERROR" "❌ Only 'auto' is currently supported for IPv6"
+                return 1
+            fi
+            ;;
+    esac
+    return 0
+}
+
+# Function to create new container
+create_new_container() {
+    print_status "INFO" "🆕 Creating a new container"
+    
+    # Container name
+    while true; do
+        read -p "$(print_status "INPUT" "🏷️  Enter container name: ")" CONTAINER_NAME
+        if validate_input "name" "$CONTAINER_NAME"; then
+            # Check if container name already exists
+            if [[ -f "$CONTAINER_DIR/$CONTAINER_NAME.conf" ]] || docker ps -a --format '{{.Names}}' | grep -q "^$CONTAINER_NAME$"; then
+                print_status "ERROR" "⚠️  Container with name '$CONTAINER_NAME' already exists"
+            else
+                break
+            fi
         fi
     done
+
+    # Container type selection
+    print_status "INFO" "📦 Select container type:"
+    echo "  1) 🐧 Systemd Container (Full OS with systemd)"
+    echo "  2) ⚡ Lightweight Container (Minimal OS)"
+    echo "  3) 🛠️  Application Container (Single app)"
+    echo "  4) 🎯 Custom Container"
+    
+    while true; do
+        read -p "$(print_status "INPUT" "🎯 Enter your choice (1-4): ")" type_choice
+        case $type_choice in
+            1) 
+                CONTAINER_TYPE="systemd"
+                break
+                ;;
+            2)
+                CONTAINER_TYPE="lightweight"
+                break
+                ;;
+            3)
+                CONTAINER_TYPE="application"
+                break
+                ;;
+            4)
+                CONTAINER_TYPE="custom"
+                break
+                ;;
+            *)
+                print_status "ERROR" "❌ Invalid selection"
+                ;;
+        esac
+    done
+
+    # Image selection based on type
+    case $CONTAINER_TYPE in
+        "systemd")
+            print_status "INFO" "🐧 Select a systemd-enabled image:"
+            echo "  1) Ubuntu 22.04 with systemd"
+            echo "  2) Debian 11 with systemd"
+            echo "  3) CentOS 7 with systemd"
+            echo "  4) Fedora Latest with systemd"
+            echo "  5) Custom image"
+            
+            while true; do
+                read -p "$(print_status "INPUT" "🎯 Enter your choice (1-5): ")" image_choice
+                case $image_choice in
+                    1) IMAGE_NAME="ubuntu:jammy" ;;
+                    2) IMAGE_NAME="debian:bullseye" ;;
+                    3) IMAGE_NAME="centos:7" ;;
+                    4) IMAGE_NAME="fedora:latest" ;;
+                    5) 
+                        read -p "$(print_status "INPUT" "🎯 Enter custom image name: ")" custom_image
+                        IMAGE_NAME="$custom_image"
+                        ;;
+                    *) 
+                        print_status "ERROR" "❌ Invalid selection"
+                        continue
+                        ;;
+                esac
+                break
+            done
+            ;;
+        "lightweight")
+            print_status "INFO" "⚡ Select a lightweight image:"
+            echo "  1) Alpine Linux (latest)"
+            echo "  2) Ubuntu Minimal"
+            echo "  3) Debian Slim"
+            echo "  4) Custom image"
+            
+            while true; do
+                read -p "$(print_status "INPUT" "🎯 Enter your choice (1-4): ")" image_choice
+                case $image_choice in
+                    1) IMAGE_NAME="alpine:latest" ;;
+                    2) IMAGE_NAME="ubuntu:jammy" ;;
+                    3) IMAGE_NAME="debian:bullseye-slim" ;;
+                    4) 
+                        read -p "$(print_status "INPUT" "🎯 Enter custom image name: ")" custom_image
+                        IMAGE_NAME="$custom_image"
+                        ;;
+                    *) 
+                        print_status "ERROR" "❌ Invalid selection"
+                        continue
+                        ;;
+                esac
+                break
+            done
+            ;;
+        "application")
+            print_status "INFO" "🛠️  Select an application image:"
+            echo "  1) Nginx Web Server"
+            echo "  2) PostgreSQL Database"
+            echo "  3) Redis Cache"
+            echo "  4) Node.js Runtime"
+            echo "  5) Custom image"
+            
+            while true; do
+                read -p "$(print_status "INPUT" "🎯 Enter your choice (1-5): ")" image_choice
+                case $image_choice in
+                    1) IMAGE_NAME="nginx:latest" ;;
+                    2) IMAGE_NAME="postgres:latest" ;;
+                    3) IMAGE_NAME="redis:latest" ;;
+                    4) IMAGE_NAME="node:latest" ;;
+                    5) 
+                        read -p "$(print_status "INPUT" "🎯 Enter custom image name: ")" custom_image
+                        IMAGE_NAME="$custom_image"
+                        ;;
+                    *) 
+                        print_status "ERROR" "❌ Invalid selection"
+                        continue
+                        ;;
+                esac
+                break
+            done
+            ;;
+        "custom")
+            read -p "$(print_status "INPUT" "🎯 Enter custom image name: ")" IMAGE_NAME
+            ;;
+    esac
+
+    # Check if image exists locally, offer to pull
+    if ! docker image inspect "$IMAGE_NAME" &>/dev/null; then
+        print_status "WARN" "📦 Image '$IMAGE_NAME' not found locally"
+        read -p "$(print_status "INPUT" "🌐 Pull image from Docker Hub? (y/N): ")" pull_choice
+        if [[ "$pull_choice" =~ ^[Yy]$ ]]; then
+            print_status "INFO" "⬇️  Pulling image $IMAGE_NAME..."
+            docker pull "$IMAGE_NAME"
+            if [ $? -ne 0 ]; then
+                print_status "ERROR" "❌ Failed to pull image"
+                return 1
+            fi
+        else
+            print_status "ERROR" "❌ Cannot create container without image"
+            return 1
+        fi
+    fi
+
+    # Resource allocation
+    print_status "INFO" "⚙️  Resource Allocation (Enter for defaults):"
+    
+    # Memory/RAM
+    while true; do
+        read -p "$(print_status "INPUT" "🧠 Memory limit (e.g., 2g, 512m) [2g]: ")" memory
+        MEMORY="${memory:-2g}"
+        if validate_input "size" "$MEMORY"; then
+            break
+        fi
+    done
+
+    # CPU
+    while true; do
+        read -p "$(print_status "INPUT" "⚡ CPU limit (e.g., 1.5, 2) [1]: ")" cpus
+        CPUS="${cpus:-1}"
+        if validate_input "number" "$CPUS"; then
+            break
+        fi
+    done
+
+    # Storage
+    while true; do
+        read -p "$(print_status "INPUT" "💾 Storage size (e.g., 20g, 100g) [20g]: ")" storage
+        STORAGE="${storage:-20g}"
+        if validate_input "size" "$STORAGE"; then
+            break
+        fi
+    done
+
+    # Network configuration
+    print_status "INFO" "🌐 Network Configuration:"
+    echo "  1) Bridge (default)"
+    echo "  2) Host"
+    echo "  3) None"
+    
+    while true; do
+        read -p "$(print_status "INPUT" "🎯 Enter network choice (1-3) [1]: ")" net_choice
+        net_choice="${net_choice:-1}"
+        case $net_choice in
+            1) NETWORK_MODE="bridge" ;;
+            2) NETWORK_MODE="host" ;;
+            3) NETWORK_MODE="none" ;;
+            *) 
+                print_status "ERROR" "❌ Invalid selection"
+                continue
+                ;;
+        esac
+        break
+    done
+
+    # IP configuration for bridge mode
+    if [[ "$NETWORK_MODE" == "bridge" ]]; then
+        while true; do
+            read -p "$(print_status "INPUT" "🔢 IPv4 Address [auto]: ")" ipv4
+            IPV4_ADDRESS="${ipv4:-auto}"
+            if validate_input "ipv4" "$IPV4_ADDRESS"; then
+                break
+            fi
+        done
+        
+        while true; do
+            read -p "$(print_status "INPUT" "🔢 IPv6 Address [auto]: ")" ipv6
+            IPV6_ADDRESS="${ipv6:-auto}"
+            if validate_input "ipv6" "$IPV6_ADDRESS"; then
+                break
+            fi
+        done
+    else
+        IPV4_ADDRESS="auto"
+        IPV6_ADDRESS="auto"
+    fi
+
+    # Port mapping
+    print_status "INFO" "🔌 Port Mapping (optional)"
+    echo "💡 Format: HOST_PORT:CONTAINER_PORT or RANGE"
+    echo "💡 Example: 80:80, 8080:8080, 3000-4000:3000-4000"
+    read -p "$(print_status "INPUT" "🔌 Enter port mappings (comma separated, Enter for none): ")" PORTS
+    PORTS="${PORTS:-}"
+
+    # Volume mounts
+    print_status "INFO" "💿 Volume Mounts (optional)"
+    echo "💡 Format: HOST_PATH:CONTAINER_PATH[:MODE]"
+    echo "💡 Example: /data:/data, ./config:/app/config:ro"
+    read -p "$(print_status "INPUT" "💿 Enter volume mounts (comma separated, Enter for none): ")" VOLUMES
+    VOLUMES="${VOLUMES:-}"
+
+    # Environment variables
+    print_status "INFO" "🔧 Environment Variables (optional)"
+    echo "💡 Format: KEY=VALUE"
+    echo "💡 Example: DB_HOST=localhost, DEBUG=true"
+    read -p "$(print_status "INPUT" "🔧 Enter environment variables (comma separated, Enter for none): ")" ENV_VARS
+    ENV_VARS="${ENV_VARS:-}"
+
+    CREATED="$(date)"
+    STATUS="stopped"
+
+    # Save configuration
+    save_container_config
+    
+    # Ask to start container now
+    read -p "$(print_status "INPUT" "🚀 Start container now? (y/N): ")" start_now
+    if [[ "$start_now" =~ ^[Yy]$ ]]; then
+        start_container "$CONTAINER_NAME"
+    fi
+}
+
+# Function to build Docker command
+build_docker_command() {
+    local container_name="$1"
+    
+    if load_container_config "$container_name"; then
+        # Start building command
+        local cmd="docker run -d"
+        
+        # Container name
+        cmd="$cmd --name '$CONTAINER_NAME'"
+        
+        # Resource limits
+        cmd="$cmd --memory='$MEMORY'"
+        cmd="$cmd --cpus='$CPUS'"
+        
+        # Storage (using tmpfs for root filesystem)
+        cmd="$cmd --tmpfs /tmp:size=$STORAGE"
+        
+        # Network configuration
+        case "$NETWORK_MODE" in
+            "host")
+                cmd="$cmd --network=host"
+                ;;
+            "none")
+                cmd="$cmd --network=none"
+                ;;
+            "bridge")
+                cmd="$cmd --network=bridge"
+                # Set IP address if specified
+                if [[ "$IPV4_ADDRESS" != "auto" ]]; then
+                    cmd="$cmd --ip '$IPV4_ADDRESS'"
+                fi
+                if [[ "$IPV6_ADDRESS" != "auto" ]]; then
+                    cmd="$cmd --ip6 '$IPV6_ADDRESS'"
+                fi
+                ;;
+        esac
+        
+        # Port mappings
+        if [[ -n "$PORTS" ]]; then
+            IFS=',' read -ra port_array <<< "$PORTS"
+            for port in "${port_array[@]}"; do
+                cmd="$cmd -p '$port'"
+            done
+        fi
+        
+        # Volume mounts
+        if [[ -n "$VOLUMES" ]]; then
+            IFS=',' read -ra volume_array <<< "$VOLUMES"
+            for volume in "${volume_array[@]}"; do
+                cmd="$cmd -v '$volume'"
+            done
+        fi
+        
+        # Environment variables
+        if [[ -n "$ENV_VARS" ]]; then
+            IFS=',' read -ra env_array <<< "$ENV_VARS"
+            for env_var in "${env_array[@]}"; do
+                cmd="$cmd -e '$env_var'"
+            done
+        fi
+        
+        # Additional options for systemd containers
+        if [[ "$CONTAINER_TYPE" == "systemd" ]]; then
+            cmd="$cmd --privileged"
+            cmd="$cmd --cap-add=SYS_ADMIN"
+            cmd="$cmd --cap-add=NET_ADMIN"
+            cmd="$cmd --tmpfs /run"
+            cmd="$cmd --tmpfs /run/lock"
+            cmd="$cmd -v /sys/fs/cgroup:/sys/fs/cgroup:ro"
+            cmd="$cmd -e container=docker"
+            # Use systemd init
+            cmd="$cmd '$IMAGE_NAME' /sbin/init"
+        else
+            # For non-systemd containers, run in background
+            cmd="$cmd '$IMAGE_NAME'"
+        fi
+        
+        echo "$cmd"
+    fi
+}
+
+# Function to start a container
+start_container() {
+    local container_name=$1
+    
+    if load_container_config "$container_name"; then
+        # Check if container is already running
+        if docker ps --format '{{.Names}}' | grep -q "^$container_name$"; then
+            print_status "WARN" "⚠️  Container '$container_name' is already running"
+            read -p "$(print_status "INPUT" "🔄 Restart container? (y/N): ")" restart_choice
+            if [[ "$restart_choice" =~ ^[Yy]$ ]]; then
+                stop_container "$container_name"
+                sleep 2
+            else
+                return 0
+            fi
+        fi
+        
+        # Check if container exists but is stopped
+        if docker ps -a --format '{{.Names}}' | grep -q "^$container_name$"; then
+            print_status "INFO" "🚀 Starting existing container: $container_name"
+            if docker start "$container_name"; then
+                STATUS="running"
+                save_container_config
+                print_status "SUCCESS" "✅ Container '$container_name' started"
+                show_container_connection_info "$container_name"
+                return 0
+            else
+                print_status "ERROR" "❌ Failed to start container"
+                return 1
+            fi
+        fi
+        
+        # Create and start new container
+        print_status "INFO" "🚀 Creating and starting container: $container_name"
+        
+        # Build Docker command
+        local docker_cmd=$(build_docker_command "$container_name")
+        
+        if [[ -z "$docker_cmd" ]]; then
+            print_status "ERROR" "❌ Failed to build Docker command"
+            return 1
+        fi
+        
+        # Show command
+        print_status "INFO" "⚡ Executing command:"
+        echo "$docker_cmd" | sed 's/--/\n  --/g'
+        echo
+        
+        # Execute command
+        if eval "$docker_cmd"; then
+            STATUS="running"
+            save_container_config
+            print_status "SUCCESS" "✅ Container '$container_name' created and started"
+            show_container_connection_info "$container_name"
+            return 0
+        else
+            print_status "ERROR" "❌ Failed to start container"
+            
+            # Clean up if container creation failed
+            docker rm -f "$container_name" 2>/dev/null
+            return 1
+        fi
+    fi
+}
+
+# Function to show container connection info
+show_container_connection_info() {
+    local container_name=$1
+    
+    print_status "INFO" "🔗 Connection Information for: $container_name"
+    echo "🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹"
+    
+    # Get container ID
+    local container_id=$(docker ps -qf "name=$container_name")
+    
+    if [[ -n "$container_id" ]]; then
+        # Get IP address
+        local ip_address=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$container_name")
+        
+        # Get exposed ports
+        local ports=$(docker port "$container_name" 2>/dev/null | tr '\n' ',' | sed 's/,$//')
+        
+        echo "📦 Container ID: ${container_id:0:12}"
+        echo "🌐 IP Address: ${ip_address:-Not assigned}"
+        
+        if [[ -n "$ports" ]]; then
+            echo "🔌 Ports: $ports"
+        fi
+        
+        # Show volume mounts
+        if [[ -n "$VOLUMES" ]]; then
+            echo "💿 Volumes: $VOLUMES"
+        fi
+        
+        # Show quick commands
+        echo "⚡ Quick Commands:"
+        echo "  📝 Enter shell: docker exec -it $container_name bash"
+        echo "  📊 View logs: docker logs $container_name"
+        echo "  📈 View stats: docker stats $container_name"
+        
+        if [[ "$CONTAINER_TYPE" == "systemd" ]]; then
+            echo "  🛠️  Systemd menu: docker exec -it $container_name systemctl"
+        fi
+    else
+        print_status "ERROR" "❌ Container not found or not running"
+    fi
+    
+    echo "🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹"
+}
+
+# Function to stop a container
+stop_container() {
+    local container_name=$1
+    
+    if load_container_config "$container_name"; then
+        # Check if container is running
+        if docker ps --format '{{.Names}}' | grep -q "^$container_name$"; then
+            print_status "INFO" "🛑 Stopping container: $container_name"
+            
+            # Ask for timeout
+            read -p "$(print_status "INPUT" "⏱️  Stop timeout in seconds [10]: ")" timeout
+            timeout="${timeout:-10}"
+            
+            if docker stop -t "$timeout" "$container_name"; then
+                STATUS="stopped"
+                save_container_config
+                print_status "SUCCESS" "✅ Container '$container_name' stopped"
+            else
+                print_status "WARN" "⚠️  Failed to stop gracefully, forcing..."
+                docker stop "$container_name"
+                STATUS="stopped"
+                save_container_config
+                print_status "SUCCESS" "✅ Container '$container_name' force stopped"
+            fi
+        elif docker ps -a --format '{{.Names}}' | grep -q "^$container_name$"; then
+            print_status "INFO" "💤 Container '$container_name' is already stopped"
+            STATUS="stopped"
+            save_container_config
+        else
+            print_status "ERROR" "❌ Container '$container_name' not found"
+            return 1
+        fi
+    fi
+}
+
+# Function to delete a container
+delete_container() {
+    local container_name=$1
+    
+    print_status "WARN" "⚠️  ⚠️  ⚠️  This will permanently delete container '$container_name' and all its data!"
+    read -p "$(print_status "INPUT" "🗑️  Are you sure? (y/N): ")" -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        if load_container_config "$container_name"; then
+            # Check if container is running
+            if docker ps --format '{{.Names}}' | grep -q "^$container_name$"; then
+                print_status "WARN" "⚠️  Container is currently running. Stopping it first..."
+                stop_container "$container_name"
+                sleep 2
+            fi
+            
+            # Remove container
+            if docker rm "$container_name" 2>/dev/null; then
+                # Remove configuration file
+                rm -f "$CONTAINER_DIR/$container_name.conf"
+                print_status "SUCCESS" "✅ Container '$container_name' has been deleted"
+            else
+                print_status "ERROR" "❌ Failed to delete container"
+            fi
+        fi
+    else
+        print_status "INFO" "👍 Deletion cancelled"
+    fi
+}
+
+# Function to show container info
+show_container_info() {
+    local container_name=$1
+    
+    if load_container_config "$container_name"; then
+        echo
+        print_status "INFO" "📊 Container Information: $container_name"
+        echo "🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹"
+        echo "🐳 Image: $IMAGE_NAME"
+        echo "📦 Type: $CONTAINER_TYPE"
+        echo "🧠 Memory: $MEMORY"
+        echo "⚡ CPUs: $CPUS"
+        echo "💾 Storage: $STORAGE"
+        echo "🌐 Network: $NETWORK_MODE"
+        echo "🔢 IPv4: $IPV4_ADDRESS"
+        echo "🔢 IPv6: $IPV6_ADDRESS"
+        echo "🔌 Ports: ${PORTS:-None}"
+        echo "💿 Volumes: ${VOLUMES:-None}"
+        echo "🔧 Env Vars: ${ENV_VARS:-None}"
+        echo "📅 Created: $CREATED"
+        echo "📊 Status: $STATUS"
+        
+        # Get real-time status
+        if docker ps --format '{{.Names}}' | grep -q "^$container_name$"; then
+            echo "🚀 Current Status: Running"
+            
+            # Get container details
+            local container_id=$(docker ps -qf "name=$container_name")
+            local ip_address=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$container_name")
+            local ports=$(docker port "$container_name" 2>/dev/null | tr '\n' ',' | sed 's/,$//')
+            
+            echo "🆔 Container ID: ${container_id:0:12}"
+            echo "🌐 Current IP: ${ip_address:-Not assigned}"
+            if [[ -n "$ports" ]]; then
+                echo "🔌 Active Ports: $ports"
+            fi
+        else
+            echo "💤 Current Status: Stopped"
+        fi
+        
+        echo "🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹🔹"
+        
+        # Show quick actions
+        echo "⚡ Quick Actions:"
+        echo "  1) 📝 Enter container shell"
+        echo "  2) 📊 View container logs"
+        echo "  3) 📈 View container stats"
+        echo "  4) 🔄 Restart container"
+        echo "  5) 📋 Copy container ID"
+        echo "  0) ↩️  Back"
+        
+        read -p "$(print_status "INPUT" "🎯 Enter your choice: ")" action_choice
+        
+        case $action_choice in
+            1)
+                enter_container_shell "$container_name"
+                ;;
+            2)
+                view_container_logs "$container_name"
+                ;;
+            3)
+                view_container_stats "$container_name"
+                ;;
+            4)
+                restart_container "$container_name"
+                ;;
+            5)
+                copy_container_id "$container_name"
+                ;;
+            0)
+                return 0
+                ;;
+            *)
+                print_status "ERROR" "❌ Invalid selection"
+                ;;
+        esac
+    fi
+}
+
+# Function to enter container shell
+enter_container_shell() {
+    local container_name=$1
+    
+    if docker ps --format '{{.Names}}' | grep -q "^$container_name$"; then
+        print_status "INFO" "📝 Entering container shell..."
+        print_status "INFO" "💡 Type 'exit' to return to menu"
+        docker exec -it "$container_name" bash || docker exec -it "$container_name" sh
+    else
+        print_status "ERROR" "❌ Container '$container_name' is not running"
+    fi
+}
+
+# Function to view container logs
+view_container_logs() {
+    local container_name=$1
+    
+    if docker ps --format '{{.Names}}' | grep -q "^$container_name$"; then
+        print_status "INFO" "📊 Showing logs for '$container_name' (Ctrl+C to exit):"
+        docker logs -f --tail 50 "$container_name"
+    else
+        print_status "ERROR" "❌ Container '$container_name' is not running"
+        # Show last logs if available
+        if docker ps -a --format '{{.Names}}' | grep -q "^$container_name$"; then
+            read -p "$(print_status "INPUT" "📜 Show last logs? (y/N): ")" show_logs
+            if [[ "$show_logs" =~ ^[Yy]$ ]]; then
+                docker logs --tail 100 "$container_name"
+            fi
+        fi
+    fi
+}
+
+# Function to view container stats
+view_container_stats() {
+    local container_name=$1
+    
+    if docker ps --format '{{.Names}}' | grep -q "^$container_name$"; then
+        print_status "INFO" "📈 Showing real-time stats for '$container_name' (Ctrl+C to exit):"
+        docker stats "$container_name"
+    else
+        print_status "ERROR" "❌ Container '$container_name' is not running"
+    fi
+}
+
+# Function to restart container
+restart_container() {
+    local container_name=$1
+    
+    if docker ps --format '{{.Names}}' | grep -q "^$container_name$"; then
+        print_status "INFO" "🔄 Restarting container: $container_name"
+        docker restart "$container_name"
+        print_status "SUCCESS" "✅ Container '$container_name' restarted"
+        sleep 2
+        show_container_connection_info "$container_name"
+    else
+        print_status "ERROR" "❌ Container '$container_name' is not running"
+    fi
+}
+
+# Function to copy container ID
+copy_container_id() {
+    local container_name=$1
+    
+    local container_id=$(docker ps -qf "name=$container_name")
+    if [[ -n "$container_id" ]]; then
+        if command -v xclip &>/dev/null; then
+            echo -n "$container_id" | xclip -selection clipboard
+            print_status "SUCCESS" "✅ Container ID copied to clipboard: ${container_id:0:12}"
+        elif command -v pbcopy &>/dev/null; then
+            echo -n "$container_id" | pbcopy
+            print_status "SUCCESS" "✅ Container ID copied to clipboard: ${container_id:0:12}"
+        else
+            print_status "INFO" "📋 Container ID: $container_id"
+            echo "💡 Manual copy: $container_id"
+        fi
+    else
+        print_status "ERROR" "❌ Container '$container_name' not found"
+    fi
+}
+
+# Function to edit container configuration
+edit_container_config() {
+    local container_name=$1
+    
+    if load_container_config "$container_name"; then
+        print_status "INFO" "✏️  Editing container: $container_name"
+        
+        while true; do
+            echo "📝 What would you like to edit?"
+            echo "  1) 🧠 Memory (RAM)"
+            echo "  2) ⚡ CPU limit"
+            echo "  3) 💾 Storage size"
+            echo "  4) 🔌 Port mappings"
+            echo "  5) 💿 Volume mounts"
+            echo "  6) 🔧 Environment variables"
+            echo "  0) ↩️  Back to main menu"
+            
+            read -p "$(print_status "INPUT" "🎯 Enter your choice: ")" edit_choice
+            
+            case $edit_choice in
+                1)
+                    while true; do
+                        read -p "$(print_status "INPUT" "🧠 Enter new memory limit (current: $MEMORY): ")" new_memory
+                        new_memory="${new_memory:-$MEMORY}"
+                        if validate_input "size" "$new_memory"; then
+                            MEMORY="$new_memory"
+                            break
+                        fi
+                    done
+                    ;;
+                2)
+                    while true; do
+                        read -p "$(print_status "INPUT" "⚡ Enter new CPU limit (current: $CPUS): ")" new_cpus
+                        new_cpus="${new_cpus:-$CPUS}"
+                        if validate_input "number" "$new_cpus"; then
+                            CPUS="$new_cpus"
+                            break
+                        fi
+                    done
+                    ;;
+                3)
+                    while true; do
+                        read -p "$(print_status "INPUT" "💾 Enter new storage size (current: $STORAGE): ")" new_storage
+                        new_storage="${new_storage:-$STORAGE}"
+                        if validate_input "size" "$new_storage"; then
+                            STORAGE="$new_storage"
+                            break
+                        fi
+                    done
+                    ;;
+                4)
+                    read -p "$(print_status "INPUT" "🔌 Enter new port mappings (current: ${PORTS:-None}): ")" new_ports
+                    PORTS="${new_ports:-$PORTS}"
+                    ;;
+                5)
+                    read -p "$(print_status "INPUT" "💿 Enter new volume mounts (current: ${VOLUMES:-None}): ")" new_volumes
+                    VOLUMES="${new_volumes:-$VOLUMES}"
+                    ;;
+                6)
+                    read -p "$(print_status "INPUT" "🔧 Enter new environment variables (current: ${ENV_VARS:-None}): ")" new_env_vars
+                    ENV_VARS="${new_env_vars:-$ENV_VARS}"
+                    ;;
+                0)
+                    return 0
+                    ;;
+                *)
+                    print_status "ERROR" "❌ Invalid selection"
+                    continue
+                    ;;
+            esac
+            
+            # Save configuration
+            save_container_config
+            
+            read -p "$(print_status "INPUT" "🔄 Continue editing? (y/N): ")" continue_editing
+            if [[ ! "$continue_editing" =~ ^[Yy]$ ]]; then
+                break
+            fi
+        done
+    fi
+}
+
+# Function to check container status
+is_container_running() {
+    local container_name=$1
+    
+    if docker ps --format '{{.Names}}' | grep -q "^$container_name$"; then
+        return 0
+    fi
     return 1
 }
 
-# Get init command for image
-get_init_command() {
-    local image=$1
-    if has_systemd "$image"; then
-        echo "/sbin/init"
-    else
-        echo "/bin/bash"
-    fi
-}
-
-# Get package manager for image
-get_package_manager() {
-    local image=$1
+# Function to show container performance
+show_container_performance() {
+    local container_name=$1
     
-    if [[ "$image" == *"ubuntu"* ]] || [[ "$image" == *"debian"* ]]; then
-        echo "apt"
-    elif [[ "$image" == *"centos"* ]] || [[ "$image" == *"rockylinux"* ]] || 
-         [[ "$image" == *"almalinux"* ]] || [[ "$image" == *"oraclelinux"* ]] || 
-         [[ "$image" == *"amazonlinux"* ]]; then
-        echo "yum"
-    elif [[ "$image" == *"fedora"* ]]; then
-        echo "dnf"
-    elif [[ "$image" == *"arch"* ]]; then
-        echo "pacman"
-    elif [[ "$image" == *"alpine"* ]]; then
-        echo "apk"
-    elif [[ "$image" == *"opensuse"* ]]; then
-        echo "zypper"
-    else
-        echo "apt"
-    fi
-}
-
-# Generate unique container name
-generate_container_name() {
-    local base_name="$1"
-    local counter=1
-    local new_name="$base_name"
-    
-    while docker ps -a --format '{{.Names}}' | grep -q "^${new_name}$"; do
-        new_name="${base_name}_${counter}"
-        ((counter++))
-        if [ $counter -gt 20 ]; then
-            new_name="${base_name}_$(date +%s)"
-            break
+    if load_container_config "$container_name"; then
+        if is_container_running "$container_name"; then
+            print_status "INFO" "📊 Performance metrics for container: $container_name"
+            echo "📈📈📈📈📈📈📈📈📈📈📈📈📈📈📈"
+            
+            # Show Docker stats
+            echo "⚡ Docker Stats:"
+            docker stats "$container_name" --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}"
+            echo
+            
+            # Show process information
+            echo "🔄 Container Processes:"
+            docker top "$container_name"
+        else
+            print_status "INFO" "💤 Container $container_name is not running"
+            echo "⚙️  Configuration:"
+            echo "  🧠 Memory: $MEMORY"
+            echo "  ⚡ CPUs: $CPUS"
+            echo "  💾 Storage: $STORAGE"
         fi
-    done
-    
-    echo "$new_name"
-}
-
-# Get resource allocation from user
-get_resource_allocation() {
-    echo -e "\n${B}════════════ RESOURCE ALLOCATION ════════════${N}"
-    echo -e "${C}Set resource limits for container (Enter for default)${N}"
-    
-    # Memory/RAM
-    read -p "RAM Memory (e.g., 2g, 512m) [$DEFAULT_RAM]: " ram
-    RAM="${ram:-$DEFAULT_RAM}"
-    
-    # Validate RAM format
-    if ! [[ "$RAM" =~ ^[0-9]+[mg]$ ]]; then
-        warning "Invalid RAM format. Using default: $DEFAULT_RAM"
-        RAM="$DEFAULT_RAM"
-    fi
-    
-    # CPU
-    read -p "CPU Cores (e.g., 2, 1.5) [$DEFAULT_CPU]: " cpu
-    CPU="${cpu:-$DEFAULT_CPU}"
-    
-    # Validate CPU
-    if ! [[ "$CPU" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
-        warning "Invalid CPU format. Using default: $DEFAULT_CPU"
-        CPU="$DEFAULT_CPU"
-    fi
-    
-    # Storage/SSD
-    read -p "Storage Size (e.g., 20g, 100g) [$DEFAULT_SSD]: " ssd
-    SSD="${ssd:-$DEFAULT_SSD}"
-    
-    if ! [[ "$SSD" =~ ^[0-9]+[mg]$ ]]; then
-        warning "Invalid storage format. Using default: $DEFAULT_SSD"
-        SSD="$DEFAULT_SSD"
-    fi
-    
-    # Port mapping
-    echo -e "\n${Y}Port Mapping (leave empty for none):${N}"
-    echo -e "${C}Format: HOST_PORT:CONTAINER_PORT or RANGE_START-RANGE_END${N}"
-    echo -e "${C}Examples: 80:80, 8080:80, 3000-4000:3000-4000${N}"
-    read -p "Port mapping: " port_map
-    
-    # Network configuration
-    echo -e "\n${Y}Network Configuration:${N}"
-    echo -e "${G}1)${N} Auto (default)"
-    echo -e "${G}2)${N} Bridge network"
-    echo -e "${G}3)${N} Host network"
-    echo -e "${G}4)${N} None (isolated)"
-    read -p "Network mode [1-4]: " net_choice
-    
-    case $net_choice in
-        2) NETWORK="bridge" ;;
-        3) NETWORK="host" ;;
-        4) NETWORK="none" ;;
-        *) NETWORK="auto" ;;
-    esac
-    
-    # IP configuration
-    if [[ "$NETWORK" == "bridge" ]] || [[ "$NETWORK" == "auto" ]]; then
-        echo -e "\n${Y}IP Configuration:${N}"
-        read -p "IPv4 Address [auto]: " ipv4
-        IPV4="${ipv4:-auto}"
-        
-        read -p "IPv6 Address [auto]: " ipv6
-        IPV6="${ipv6:-auto}"
-    fi
-    
-    echo -e "\n${G}Resource Summary:${N}"
-    echo -e "  RAM: $RAM"
-    echo -e "  CPU: $CPU cores"
-    echo -e "  Storage: $SSD"
-    echo -e "  Network: $NETWORK"
-    if [[ "$NETWORK" != "none" ]]; then
-        echo -e "  IPv4: $IPV4"
-        echo -e "  IPv6: $IPV6"
-    fi
-    if [ -n "$port_map" ]; then
-        echo -e "  Ports: $port_map"
+        echo "📈📈📈📈📈📈📈📈📈📈📈📈📈📈📈"
+        read -p "$(print_status "INPUT" "⏎ Press Enter to continue...")"
     fi
 }
 
-# Display available images
-display_images() {
-    section "AVAILABLE IMAGES"
+# Function to fix container issues
+fix_container_issues() {
+    local container_name=$1
     
-    echo -e "${G}Systemd-enabled Images (Recommended):${N}"
-    echo "------------------------------------------------"
-    for i in "${!SYSTEMD_IMAGES[@]}"; do
-        img="${SYSTEMD_IMAGES[$i]}"
-        printf "${G}%2d)${N} %-30s\n" "$((i+1))" "$img"
-    done
-    echo "------------------------------------------------"
-    echo -e "${Y}Other Images (no systemd):${N}"
-    echo "  ubuntu:latest, ubuntu:22.04, ubuntu:20.04, ubuntu:18.04"
-    echo "  debian:latest, debian:11, debian:10"
-    echo "------------------------------------------------"
-    
-    echo -e "\n${C}Select an option:${N}"
-    echo -e "${G}1)${N} Use systemd-enabled image"
-    echo -e "${Y}2)${N} Use other image"
-    echo -e "${M}3)${N} Enter custom image"
-    read -p "Choice [1-3]: " img_choice
-    
-    case $img_choice in
-        1)
-            read -p "Select image [1-${#SYSTEMD_IMAGES[@]}]: " select_num
-            if [[ "$select_num" =~ ^[0-9]+$ ]] && [ "$select_num" -ge 1 ] && [ "$select_num" -le "${#SYSTEMD_IMAGES[@]}" ]; then
-                IMAGE_NAME="${SYSTEMD_IMAGES[$((select_num-1))]}"
-                success "Selected: $IMAGE_NAME"
-                return 0
-            else
-                error "Invalid selection"
-                return 1
-            fi
-            ;;
-        2)
-            echo -e "\n${Y}Available images:${N}"
-            echo "  ubuntu:latest, ubuntu:22.04, ubuntu:20.04, ubuntu:18.04"
-            echo "  debian:latest, debian:11, debian:10"
-            read -p "Enter image name: " custom_img
-            IMAGE_NAME="$custom_img"
-            warning "Note: $IMAGE_NAME may not have systemd"
-            return 0
-            ;;
-        3)
-            read -p "Enter custom image (e.g., nginx:alpine): " custom_img
-            IMAGE_NAME="$custom_img"
-            warning "Using custom image: $IMAGE_NAME"
-            return 0
-            ;;
-        *)
-            error "Invalid choice"
-            return 1
-            ;;
-    esac
-}
-
-# Check if image exists locally, pull if not
-ensure_image_exists() {
-    if ! docker image inspect "$IMAGE_NAME" &>/dev/null; then
-        warning "Image $IMAGE_NAME not found locally"
-        echo -e "${Y}Options:${N}"
-        echo -e "${G}1)${N} Pull image now"
-        echo -e "${Y}2)${N} Select different image"
-        echo -e "${R}3)${N} Exit"
+    if load_container_config "$container_name"; then
+        print_status "INFO" "🔧 Fixing issues for container: $container_name"
         
-        read -p "Choice [1-3]: " pull_choice
+        echo "🔧 Select issue to fix:"
+        echo "  1) 🔓 Force remove container (if stuck)"
+        echo "  2) 🗑️  Remove all unused resources"
+        echo "  3) 🔄 Restart Docker service"
+        echo "  4) 📦 Recreate container from config"
+        echo "  0) ↩️  Back"
         
-        case $pull_choice in
+        read -p "$(print_status "INPUT" "🎯 Enter your choice: ")" fix_choice
+        
+        case $fix_choice in
             1)
-                status "Pulling $IMAGE_NAME..."
-                docker pull "$IMAGE_NAME"
-                if [ $? -eq 0 ]; then
-                    success "Image pulled successfully"
-                    return 0
-                else
-                    error "Failed to pull image"
-                    return 1
-                fi
+                print_status "WARN" "⚠️  Force removing container..."
+                docker rm -f "$container_name" 2>/dev/null
+                print_status "SUCCESS" "✅ Container force removed if it existed"
                 ;;
             2)
-                display_images
-                ensure_image_exists
+                print_status "INFO" "🗑️  Cleaning up unused Docker resources..."
+                docker system prune -f
+                print_status "SUCCESS" "✅ Unused resources cleaned"
                 ;;
             3)
-                exit 0
+                print_status "INFO" "🔄 Restarting Docker service..."
+                sudo systemctl restart docker 2>/dev/null || sudo service docker restart 2>/dev/null
+                print_status "SUCCESS" "✅ Docker service restarted"
+                ;;
+            4)
+                print_status "INFO" "📦 Recreating container from configuration..."
+                if docker ps -a --format '{{.Names}}' | grep -q "^$container_name$"; then
+                    docker rm -f "$container_name"
+                fi
+                start_container "$container_name"
+                ;;
+            0)
+                return 0
                 ;;
             *)
-                error "Invalid choice"
-                return 1
+                print_status "ERROR" "❌ Invalid selection"
                 ;;
         esac
-    else
-        success "Image found locally: $IMAGE_NAME"
-        return 0
     fi
 }
 
-# Create container with specified resources
-create_container_with_resources() {
-    local name="$1"
-    local image="$2"
-    local ram="$3"
-    local cpu="$4"
-    local ssd="$5"
-    local network="$6"
-    local ipv4="$7"
-    local ipv6="$8"
-    local ports="$9"
-    
-    status "Creating container '$name' with resources..."
-    
-    # Build base command
-    CMD="docker run -dit"
-    
-    # Container name and hostname
-    CMD="$CMD --name '$name'"
-    CMD="$CMD --hostname '$name'"
-    
-    # Resource limits
-    CMD="$CMD --memory='$ram'"
-    CMD="$CMD --cpus='$cpu'"
-    
-    # Storage limit (using tmpfs for root)
-    CMD="$CMD --tmpfs /tmp:size=$ssd"
-    
-    # Network configuration
-    case "$network" in
-        "host")
-            CMD="$CMD --network=host"
-            ;;
-        "none")
-            CMD="$CMD --network=none"
-            ;;
-        "bridge")
-            CMD="$CMD --network=bridge"
-            if [[ "$ipv4" != "auto" ]]; then
-                CMD="$CMD --ip '$ipv4'"
-            fi
-            if [[ "$ipv6" != "auto" ]]; then
-                CMD="$CMD --ip6 '$ipv6'"
-            fi
-            ;;
-        *)
-            CMD="$CMD --network=bridge"
-            ;;
-    esac
-    
-    # Port mapping
-    if [ -n "$ports" ]; then
-        IFS=',' read -ra PORT_ARRAY <<< "$ports"
-        for port in "${PORT_ARRAY[@]}"; do
-            CMD="$CMD -p '$port'"
-        done
-    fi
-    
-    # For systemd containers
-    if has_systemd "$image"; then
-        CMD="$CMD --privileged"
-        CMD="$CMD --cap-add=SYS_ADMIN"
-        CMD="$CMD --cap-add=NET_ADMIN"
-        CMD="$CMD --tmpfs /run"
-        CMD="$CMD --tmpfs /run/lock"
-        CMD="$CMD -v /sys/fs/cgroup:/sys/fs/cgroup:ro"
-        CMD="$CMD -e container=docker"
-        
-        INIT_CMD="/sbin/init"
-    else
-        # For non-systemd containers
-        CMD="$CMD -it"
-        INIT_CMD="/bin/bash"
-    fi
-    
-    # Add volume for persistent data
-    CMD="$CMD -v '${name}-data:/data'"
-    
-    # Add image and init command
-    CMD="$CMD '$image' '$INIT_CMD'"
-    
-    # Show command
-    echo -e "${Y}Executing command:${N}"
-    echo "$CMD" | sed 's/--/\n  --/g'
-    echo
-    
-    # Execute
-    eval "$CMD"
-    
-    if [ $? -eq 0 ]; then
-        success "Container created successfully!"
-        
-        # For non-systemd containers, start bash session
-        if ! has_systemd "$image"; then
-            echo -e "${Y}Starting interactive session...${N}"
-            echo -e "${C}Type 'exit' to return to menu${N}"
-            docker attach "$name"
-        fi
-        
-        return 0
-    else
-        error "Failed to create container"
-        return 1
-    fi
-}
-
-# Install systemd in Ubuntu/Debian if needed
-install_systemd_in_container() {
-    local container="$1"
-    local image="$2"
-    
-    if [[ "$image" == *"ubuntu"* ]] || [[ "$image" == *"debian"* ]]; then
-        if ! has_systemd "$image"; then
-            echo -e "${Y}Installing systemd in container...${N}"
-            docker exec "$container" apt update
-            docker exec "$container" apt install -y systemd systemd-sysv dbus
-            docker exec "$container" apt install -y curl wget nano vim htop
-        fi
-    fi
-}
-
-# Main menu
+# Main menu function
 main_menu() {
     while true; do
-        clear
-        echo -e "${B}╔════════════════════════════════════════════════╗${N}"
-        echo -e "${B}║${W}        DOCKER CONTAINER MANAGER v2.0          ${B}║${N}"
-        echo -e "${B}╠════════════════════════════════════════════════╣${N}"
-        echo -e "${B}║${G} 1️⃣   Create New Container with Resources      ${B}║${N}"
-        echo -e "${B}║${Y} 2️⃣   Manage Existing Containers              ${B}║${N}"
-        echo -e "${B}║${C} 3️⃣   Enter Container Menu                    ${B}║${N}"
-        echo -e "${B}║${M} 4️⃣   View All Containers                     ${B}║${N}"
-        echo -e "${B}║${R} 5️⃣   Exit                                    ${B}║${N}"
-        echo -e "${B}╚════════════════════════════════════════════════╝${N}"
+        display_header
+        
+        local containers=($(get_container_list))
+        local container_count=${#containers[@]}
+        
+        if [ $container_count -gt 0 ]; then
+            print_status "INFO" "📁 Found $container_count container(s):"
+            for i in "${!containers[@]}"; do
+                local status="💤"
+                if is_container_running "${containers[$i]}"; then
+                    status="🚀"
+                fi
+                printf "  %2d) %s %s\n" $((i+1)) "${containers[$i]}" "$status"
+            done
+            echo
+        fi
+        
+        echo "📋 Main Menu:"
+        echo "  1) 🆕 Create a new container"
+        if [ $container_count -gt 0 ]; then
+            echo "  2) 🚀 Start a container"
+            echo "  3) 🛑 Stop a container"
+            echo "  4) 📊 Show container info"
+            echo "  5) ✏️  Edit container configuration"
+            echo "  6) 🗑️  Delete a container"
+            echo "  7) 📊 Show container performance"
+            echo "  8) 🔧 Fix container issues"
+        fi
+        echo "  9) 📦 List all Docker containers"
+        echo "  0) 👋 Exit"
         echo
         
-        read -p "Select [1-5]: " choice
+        read -p "$(print_status "INPUT" "🎯 Enter your choice: ")" choice
         
         case $choice in
             1)
-                create_container_flow
+                create_new_container
                 ;;
             2)
-                manage_containers
+                if [ $container_count -gt 0 ]; then
+                    read -p "$(print_status "INPUT" "🚀 Enter container number to start: ")" container_num
+                    if [[ "$container_num" =~ ^[0-9]+$ ]] && [ "$container_num" -ge 1 ] && [ "$container_num" -le $container_count ]; then
+                        start_container "${containers[$((container_num-1))]}"
+                    else
+                        print_status "ERROR" "❌ Invalid selection"
+                    fi
+                fi
                 ;;
             3)
-                enter_container_menu
+                if [ $container_count -gt 0 ]; then
+                    read -p "$(print_status "INPUT" "🛑 Enter container number to stop: ")" container_num
+                    if [[ "$container_num" =~ ^[0-9]+$ ]] && [ "$container_num" -ge 1 ] && [ "$container_num" -le $container_count ]; then
+                        stop_container "${containers[$((container_num-1))]}"
+                    else
+                        print_status "ERROR" "❌ Invalid selection"
+                    fi
+                fi
                 ;;
             4)
-                docker ps -a --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
-                echo
-                read -p "Press Enter to continue..."
+                if [ $container_count -gt 0 ]; then
+                    read -p "$(print_status "INPUT" "📊 Enter container number to show info: ")" container_num
+                    if [[ "$container_num" =~ ^[0-9]+$ ]] && [ "$container_num" -ge 1 ] && [ "$container_num" -le $container_count ]; then
+                        show_container_info "${containers[$((container_num-1))]}"
+                    else
+                        print_status "ERROR" "❌ Invalid selection"
+                    fi
+                fi
                 ;;
             5)
-                echo -e "${G}Goodbye!${N}"
+                if [ $container_count -gt 0 ]; then
+                    read -p "$(print_status "INPUT" "✏️  Enter container number to edit: ")" container_num
+                    if [[ "$container_num" =~ ^[0-9]+$ ]] && [ "$container_num" -ge 1 ] && [ "$container_num" -le $container_count ]; then
+                        edit_container_config "${containers[$((container_num-1))]}"
+                    else
+                        print_status "ERROR" "❌ Invalid selection"
+                    fi
+                fi
+                ;;
+            6)
+                if [ $container_count -gt 0 ]; then
+                    read -p "$(print_status "INPUT" "🗑️  Enter container number to delete: ")" container_num
+                    if [[ "$container_num" =~ ^[0-9]+$ ]] && [ "$container_num" -ge 1 ] && [ "$container_num" -le $container_count ]; then
+                        delete_container "${containers[$((container_num-1))]}"
+                    else
+                        print_status "ERROR" "❌ Invalid selection"
+                    fi
+                fi
+                ;;
+            7)
+                if [ $container_count -gt 0 ]; then
+                    read -p "$(print_status "INPUT" "📊 Enter container number to show performance: ")" container_num
+                    if [[ "$container_num" =~ ^[0-9]+$ ]] && [ "$container_num" -ge 1 ] && [ "$container_num" -le $container_count ]; then
+                        show_container_performance "${containers[$((container_num-1))]}"
+                    else
+                        print_status "ERROR" "❌ Invalid selection"
+                    fi
+                fi
+                ;;
+            8)
+                if [ $container_count -gt 0 ]; then
+                    read -p "$(print_status "INPUT" "🔧 Enter container number to fix issues: ")" container_num
+                    if [[ "$container_num" =~ ^[0-9]+$ ]] && [ "$container_num" -ge 1 ] && [ "$container_num" -le $container_count ]; then
+                        fix_container_issues "${containers[$((container_num-1))]}"
+                    else
+                        print_status "ERROR" "❌ Invalid selection"
+                    fi
+                fi
+                ;;
+            9)
+                print_status "INFO" "📦 All Docker containers:"
+                echo "🚀 Running containers:"
+                docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
+                echo
+                echo "💤 Stopped containers:"
+                docker ps -a --filter "status=exited" --format "table {{.Names}}\t{{.Image}}\t{{.Status}}"
+                echo
+                read -p "$(print_status "INPUT" "⏎ Press Enter to continue...")"
+                ;;
+            0)
+                print_status "INFO" "👋 Goodbye!"
                 exit 0
                 ;;
             *)
-                echo -e "${R}Invalid option${N}"
-                sleep 1
+                print_status "ERROR" "❌ Invalid option"
                 ;;
         esac
+        
+        read -p "$(print_status "INPUT" "⏎ Press Enter to continue...")"
     done
 }
 
-# Create container flow
-create_container_flow() {
-    section "CREATE NEW CONTAINER"
-    
-    # Get container name
-    CONTAINER_NAME=$(generate_container_name "$DEFAULT_PREFIX")
-    read -p "Container name [$CONTAINER_NAME]: " custom_name
-    if [ -n "$custom_name" ]; then
-        CONTAINER_NAME="$custom_name"
-        if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
-            CONTAINER_NAME=$(generate_container_name "$CONTAINER_NAME")
-            warning "Name exists, using: $CONTAINER_NAME"
-        fi
-    fi
-    
-    # Select image
-    display_images || return 1
-    ensure_image_exists || return 1
-    
-    # Get resource allocation
-    get_resource_allocation
-    
-    # Confirm
-    echo -e "\n${B}════════════ CONFIRMATION ════════════${N}"
-    echo -e "${C}Create container with these settings?${N}"
-    echo -e "  Name: $CONTAINER_NAME"
-    echo -e "  Image: $IMAGE_NAME"
-    echo -e "  RAM: $RAM"
-    echo -e "  CPU: $CPU"
-    echo -e "  Storage: $SSD"
-    echo -e "  Network: $NETWORK"
-    
-    read -p "Proceed? [y/N]: " confirm
-    if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
-        warning "Cancelled"
-        return 1
-    fi
-    
-    # Create container
-    create_container_with_resources \
-        "$CONTAINER_NAME" \
-        "$IMAGE_NAME" \
-        "$RAM" \
-        "$CPU" \
-        "$SSD" \
-        "$NETWORK" \
-        "$IPV4" \
-        "$IPV6" \
-        "$port_map"
-    
-    if [ $? -eq 0 ]; then
-        # Install tools if needed
-        install_systemd_in_container "$CONTAINER_NAME" "$IMAGE_NAME"
-        
-        # Show container info
-        show_container_info "$CONTAINER_NAME"
-        
-        # Ask to enter container
-        if has_systemd "$IMAGE_NAME"; then
-            read -p "Enter container menu now? [y/N]: " enter_now
-            if [[ "$enter_now" =~ ^[Yy]$ ]]; then
-                enter_container "$CONTAINER_NAME"
-            fi
-        fi
-    fi
-    
-    echo
-    read -p "Press Enter to continue..."
-}
-
-# Manage existing containers
-manage_containers() {
-    section "MANAGE CONTAINERS"
-    
-    containers=$(docker ps -a --format "{{.Names}}")
-    if [ -z "$containers" ]; then
-        echo -e "${Y}No containers found${N}"
-        read -p "Press Enter to continue..."
-        return
-    fi
-    
-    echo -e "${C}Existing containers:${N}"
-    select container in $containers "Back"; do
-        if [ "$container" = "Back" ]; then
-            return
-        elif [ -n "$container" ]; then
-            container_menu "$container"
-            break
-        fi
-    done
-}
-
-# Container management menu
-container_menu() {
-    local container=$1
-    
-    while true; do
-        clear
-        echo -e "${B}════════════ MANAGING: $container ════════════${N}"
-        
-        # Get container status
-        status=$(docker inspect -f '{{.State.Status}}' "$container" 2>/dev/null)
-        if [ -z "$status" ]; then
-            error "Container not found"
-            return 1
-        fi
-        
-        echo -e "${G}Status:${N} $status"
-        echo -e "${G}Image:${N} $(docker inspect -f '{{.Config.Image}}' "$container")"
-        echo -e "${G}IP:${N} $(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$container" 2>/dev/null || echo 'N/A')"
-        
-        echo -e "\n${C}Actions:${N}"
-        echo -e "${G}1)${N} Start"
-        echo -e "${Y}2)${N} Stop"
-        echo -e "${C}3)${N} Restart"
-        echo -e "${M}4)${N} Remove"
-        echo -e "${W}5)${N} View Logs"
-        echo -e "${G}6)${N} Execute Command"
-        echo -e "${Y}7)${N} Enter Shell"
-        echo -e "${R}8)${N} Back"
-        
-        read -p "Select [1-8]: " action
-        
-        case $action in
-            1)
-                docker start "$container"
-                success "Container started"
-                sleep 1
-                ;;
-            2)
-                docker stop "$container"
-                success "Container stopped"
-                sleep 1
-                ;;
-            3)
-                docker restart "$container"
-                success "Container restarted"
-                sleep 1
-                ;;
-            4)
-                read -p "Remove container $container? [y/N]: " confirm
-                if [[ "$confirm" =~ ^[Yy]$ ]]; then
-                    docker rm -f "$container"
-                    success "Container removed"
-                    return 0
-                fi
-                ;;
-            5)
-                docker logs --tail 50 "$container"
-                echo
-                read -p "Press Enter to continue..."
-                ;;
-            6)
-                read -p "Command to execute: " cmd
-                if [ -n "$cmd" ]; then
-                    docker exec "$container" bash -c "$cmd"
-                fi
-                echo
-                read -p "Press Enter to continue..."
-                ;;
-            7)
-                echo -e "${Y}Entering container shell...${N}"
-                echo -e "${C}Type 'exit' to return${N}"
-                docker exec -it "$container" bash || docker exec -it "$container" sh
-                ;;
-            8)
-                return
-                ;;
-            *)
-                error "Invalid option"
-                sleep 1
-                ;;
-        esac
-    done
-}
-
-# Enter container management menu
-enter_container_menu() {
-    section "ENTER CONTAINER MENU"
-    
-    containers=$(docker ps --format "{{.Names}}")
-    if [ -z "$containers" ]; then
-        echo -e "${Y}No running containers found${N}"
-        read -p "Press Enter to continue..."
-        return
-    fi
-    
-    echo -e "${C}Running containers:${N}"
-    select container in $containers "Back"; do
-        if [ "$container" = "Back" ]; then
-            return
-        elif [ -n "$container" ]; then
-            enter_container "$container"
-            break
-        fi
-    done
-}
-
-# Enter container with management menu
-enter_container() {
-    local container=$1
-    
-    # Check if container has systemd menu
-    if docker exec "$container" test -f /root/container-system.sh 2>/dev/null; then
-        docker exec -it "$container" bash /root/container-system.sh
-    else
-        # Create basic menu if not exists
-        warning "No management menu found. Creating basic menu..."
-        create_basic_menu "$container"
-        docker exec -it "$container" bash /root/container-system.sh
-    fi
-}
-
-# Create basic management menu
-create_basic_menu() {
-    local container=$1
-    local image=$(docker inspect -f '{{.Config.Image}}' "$container")
-    
-    docker exec "$container" bash -c 'cat > /root/container-system.sh' <<'EOF'
-#!/bin/bash
-
-# Colors
-G="\e[32m"; R="\e[31m"; Y="\e[33m"; C="\e[36m"; W="\e[97m"; B="\e[34m"; N="\e[0m"
-
-while true; do
-clear
-echo -e "${B}╔════════════════════════════════════════════════╗${N}"
-echo -e "${B}║${W}          CONTAINER MANAGEMENT MENU            ${B}║${N}"
-echo -e "${B}╠════════════════════════════════════════════════╣${N}"
-echo -e "${B}║${G} 1) System Information                         ${B}║${N}"
-echo -e "${B}║${Y} 2) Install Packages                           ${B}║${N}"
-echo -e "${B}║${C} 3) Network Configuration                      ${B}║${N}"
-echo -e "${B}║${W} 4) Process Management                         ${B}║${N}"
-echo -e "${B}║${M} 5) File Browser                               ${B}║${N}"
-echo -e "${B}║${G} 6) Run Custom Command                         ${B}║${N}"
-echo -e "${B}║${R} 7) Exit to Host                               ${B}║${N}"
-echo -e "${B}╚════════════════════════════════════════════════╝${N}"
-echo -e "${C}Hostname: $(hostname)${N}"
-echo
-
-read -p "Select [1-7]: " choice
-
-case $choice in
-1)
-  echo -e "${B}════════════ SYSTEM INFO ════════════${N}"
-  echo -e "${G}OS:${N}"
-  cat /etc/os-release 2>/dev/null | grep -E "PRETTY_NAME|NAME|VERSION"
-  echo -e "\n${G}Uptime:${N}"
-  uptime
-  echo -e "\n${G}Resources:${N}"
-  echo -e "CPU: $(nproc) cores"
-  free -h | awk '/^Mem:/ {print "RAM: " $3 "/" $2}'
-  df -h / | awk 'NR==2 {print "Disk: " $3 "/" $2 " used"}'
-  ;;
-2)
-  echo -e "${B}════════════ INSTALL PACKAGES ════════════${N}"
-  if command -v apt &>/dev/null; then
-    read -p "Package name: " pkg
-    apt update && apt install -y "$pkg"
-  elif command -v yum &>/dev/null; then
-    read -p "Package name: " pkg
-    yum install -y "$pkg"
-  elif command -v apk &>/dev/null; then
-    read -p "Package name: " pkg
-    apk add "$pkg"
-  else
-    echo "Unknown package manager"
-  fi
-  ;;
-3)
-  echo -e "${B}════════════ NETWORK ════════════${N}"
-  echo -e "${G}IP Address:${N} $(hostname -I 2>/dev/null || echo 'N/A')"
-  echo -e "\n${G}Connections:${N}"
-  ss -tulpn 2>/dev/null | head -20
-  ;;
-4)
-  echo -e "${B}════════════ PROCESSES ════════════${N}"
-  ps aux --sort=-%cpu | head -20
-  ;;
-5)
-  echo -e "${B}════════════ FILE BROWSER ════════════${N}"
-  read -p "Directory [/]: " dir
-  ls -la "${dir:-/}" | head -30
-  ;;
-6)
-  echo -e "${B}════════════ CUSTOM COMMAND ════════════${N}"
-  read -p "Command: " cmd
-  if [ -n "$cmd" ]; then
-    echo -e "${Y}Output:${N}"
-    eval "$cmd"
-  fi
-  ;;
-7)
-  echo -e "${G}Exiting...${N}"
-  exit 0
-  ;;
-*)
-  echo -e "${R}Invalid option${N}"
-  ;;
-esac
-
-echo
-read -p "Press Enter to continue..."
-done
-EOF
-
-    docker exec "$container" chmod +x /root/container-system.sh
-    success "Basic menu created"
-}
-
-# Show container info
-show_container_info() {
-    local container=$1
-    
-    section "CONTAINER INFO"
-    
-    echo -e "${G}Container:${N} $container"
-    echo -e "${G}Status:${N} $(docker inspect -f '{{.State.Status}}' "$container")"
-    echo -e "${G}Image:${N} $(docker inspect -f '{{.Config.Image}}' "$container")"
-    echo -e "${G}IP Address:${N} $(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$container" 2>/dev/null || echo 'N/A')"
-    echo -e "${G}Created:${N} $(docker inspect -f '{{.Created}}' "$container" | cut -d'T' -f1)"
-    echo -e "${G}Ports:${N} $(docker port "$container" 2>/dev/null | tr '\n' ',' | sed 's/,$//' || echo 'None')"
-    
-    # Resource usage
-    echo -e "\n${G}Resource Usage:${N}"
-    docker stats "$container" --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}\t{{.NetIO}}\t{{.BlockIO}}"
-}
-
-# Cleanup on exit
-cleanup() {
-    echo -e "\n${Y}Exiting...${N}"
-    exit 0
-}
-trap cleanup SIGINT SIGTERM
+# Set trap for cleanup
+trap 'print_status "INFO" "👋 Exiting..."; exit 0' SIGINT
 
 # Main execution
-section "DOCKER CONTAINER MANAGER"
-echo -e "${W}Complete Container Management with Resource Allocation${N}"
+check_dependencies
 
-# Check Docker
-if ! command -v docker &>/dev/null; then
-    error "Docker not installed. Please install Docker first."
-    exit 1
-fi
+# Initialize paths
+CONTAINER_DIR="${CONTAINER_DIR:-$HOME/docker-containers}"
+mkdir -p "$CONTAINER_DIR"
 
-# Start main menu
+# Start the main menu
 main_menu
