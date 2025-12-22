@@ -48,7 +48,6 @@ step "Switching to Pterodactyl directory"
 cd "$PTERODACTYL_DIRECTORY" || fail "Pterodactyl directory not found"
 
 step "Downloading Blueprint Framework (latest)"
-wget "$(curl -s https://api.github.com/repos/BlueprintFramework/framework/releases/latest | grep browser_download_url | cut -d '"' -f 4)" -O release.zip || fail "Download failed"
 wget https://github.com/BlueprintFramework/framework/releases/download/beta-2025-12/release.zip
 unzip -o release.zip || fail "Unzip failed"
 ok "Blueprint downloaded & extracted"
