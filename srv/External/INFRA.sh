@@ -26,7 +26,7 @@ case $im in
 3)
   clear
   echo -e "${C_MAIN}Installing 1Panel...${NC}"
-  curl -fsSL https://resource.fit2cloud.com/1panel/package/quick_start.sh | bash
+  bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/refs/heads/main/srv/External/1panel.sh)
   pause
 ;;
 4)
