@@ -1,585 +1,135 @@
 #!/bin/bash
 # ===========================================================
-# CODING HUB Terminal Control Panel - 2026 Edition
+# CODING HUB Terminal Control Panel — NEW UI
 # Mode By - Nobita
 # ===========================================================
 
-# --- COLORS 2026 ---
-RED='\033[1;31m'
-GREEN='\033[1;32m'
-YELLOW='\033[1;33m'
-CYAN='\033[1;36m'
-BLUE='\033[1;34m'
-PURPLE='\033[1;35m'
-WHITE='\033[1;37m'
-ORANGE='\033[1;38;5;208m'
-PINK='\033[1;38;5;213m'
-TEAL='\033[1;38;5;51m'
+# ---------- COLORS ----------
+C1='\033[38;5;81m'   # Neon Blue
+C2='\033[38;5;220m'  # Gold
+C3='\033[38;5;46m'   # Green
+C4='\033[38;5;196m'  # Red
+C5='\033[38;5;245m'  # Gray
 NC='\033[0m'
 
-# --- ANIMATION EFFECTS ---
-blink='\033[5m'
-bold='\033[1m'
-underline='\033[4m'
+pause(){ read -p "↳ Press Enter to continue..." _; }
 
-pause(){ 
-    echo -e "${TEAL}"; 
-    echo -e "╔════════════════════════════════════════╗"
-    echo -e "║                                        ║"
-    echo -e "║   Press ${underline}Enter${NC}${TEAL} to continue...         ║"
-    echo -e "║                                        ║"
-    echo -e "╚════════════════════════════════════════╝"
-    read -p "" x; 
-    echo -e "${NC}"; 
-}
+# ---------- UI BLOCKS ----------
+hr(){ echo -e "${C5}┌──────────────────────────────────────────────┐${NC}"; }
+fr(){ echo -e "${C5}└──────────────────────────────────────────────┘${NC}"; }
+ln(){ printf "${C5}│${NC} %-44s ${C5}│${NC}\n" "$1"; }
 
-# ===================== BANNER 2026 =====================
-banner_2026(){
-clear
-echo -e "${TEAL}╔════════════════════════════════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${TEAL}║                                                                                        ║${NC}"
-echo -e "${TEAL}║  ${ORANGE}██████╗ ██████╗ ██████╗ ██╗███╗   ██╗ ██████╗      ██╗  ██╗██╗   ██╗██████╗     ██╗  ██╗${NC}${TEAL}║${NC}"
-echo -e "${TEAL}║  ${ORANGE}██╔════╝██╔═══██╗██╔══██╗██║████╗  ██║██╔════╝      ██║  ██║██║   ██║██╔══██╗    ╚██╗██╔╝${NC}${TEAL}║${NC}"
-echo -e "${TEAL}║  ${ORANGE}██║     ██║   ██║██║  ██║██║██╔██╗ ██║██║  ███╗     ███████║██║   ██║██████╔╝     ╚███╔╝ ${NC}${TEAL}║${NC}"
-echo -e "${TEAL}║  ${ORANGE}██║     ██║   ██║██║  ██║██║██║╚██╗██║██║   ██║     ██╔══██║██║   ██║██╔══██╗     ██╔██╗ ${NC}${TEAL}║${NC}"
-echo -e "${TEAL}║  ${ORANGE}╚██████╗╚██████╔╝██████╔╝██║██║ ╚████║╚██████╔╝     ██║  ██║╚██████╔╝██████╔╝    ██╔╝ ██╗${NC}${TEAL}║${NC}"
-echo -e "${TEAL}║  ${ORANGE} ╚═════╝ ╚═════╝ ╚═════╝ ╚═╝╚═╝  ╚═══╝ ╚═════╝      ╚═╝  ╚═╝ ╚═════╝ ╚═════╝     ╚═╝  ╚═╝${NC}${TEAL}║${NC}"
-echo -e "${TEAL}║                                                                                        ║${NC}"
-echo -e "${TEAL}║  ${PINK}╔══════════════════════════════════════════════════════════════════════════════╗${NC}${TEAL}║${NC}"
-echo -e "${TEAL}║  ${PINK}║                        🚀 CODING HUB 2026 EDITION 🚀                       ║${NC}${TEAL}║${NC}"
-echo -e "${TEAL}║  ${PINK}╚══════════════════════════════════════════════════════════════════════════════╝${NC}${TEAL}║${NC}"
-echo -e "${TEAL}║                                                                                        ║${NC}"
-echo -e "${TEAL}║  ${YELLOW}📅 Version: 2026.1.0          ${GREEN}⚡ AI-Enhanced           ${BLUE}🔒 Secure${NC}${TEAL}                 ║${NC}"
-echo -e "${TEAL}║                                                                                        ║${NC}"
-echo -e "${TEAL}╚════════════════════════════════════════════════════════════════════════════════════════╝${NC}"
-echo -e ""
-}
-
-# ===================== BANNER LEGACY =====================
+# ---------- BANNER ----------
 banner(){
 clear
-echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e ""
-echo -e "${YELLOW} ██████╗ ██████╗ ██████╗ ██╗███╗   ██╗ ██████╗     ██╗  ██╗██╗   ██╗██████╗ ${NC}"
-echo -e "${YELLOW}██╔════╝██╔═══██╗██╔══██╗██║████╗  ██║██╔════╝     ██║  ██║██║   ██║██╔══██╗${NC}"
-echo -e "${YELLOW}██║     ██║   ██║██║  ██║██║██╔██╗ ██║██║  ███╗    ███████║██║   ██║██████╔╝${NC}"
-echo -e "${YELLOW}██║     ██║   ██║██║  ██║██║██║╚██╗██║██║   ██║    ██╔══██║██║   ██║██╔══██╗${NC}"
-echo -e "${YELLOW}╚██████╗╚██████╔╝██████╔╝██║██║ ╚████║╚██████╔╝    ██║  ██║╚██████╔╝██████╔╝${NC}"
-echo -e "${YELLOW} ╚═════╝ ╚═════╝ ╚═════╝ ╚═╝╚═╝  ╚═══╝ ╚═════╝     ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ${NC}"
-echo -e ""
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "                ${WHITE}Mode By - Nobita${NC}"
-echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+hr
+ln "🚀 CODING HUB — TERMINAL CONTROL PANEL"
+ln "Mode By: Nobita"
+ln "Status : Online"
+fr
 echo
 }
 
-# ===================== NEW 2026 FEATURES MENU =====================
-features_2026_menu(){
-while true; do banner_2026
-echo -e "${PINK}╔════════════════════════════════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${PINK}║                              🆕 2026 EXCLUSIVE FEATURES 🆕                              ║${NC}"
-echo -e "${PINK}╠════════════════════════════════════════════════════════════════════════════════════════╣${NC}"
-echo -e "${PINK}║                                                                                        ║${NC}"
-echo -e "${PINK}║  ${TEAL}1)${WHITE} 🎮 AI-Powered Panel Optimizer                                   ${GREEN}[NEW]${NC}${PINK}          ║${NC}"
-echo -e "${PINK}║  ${TEAL}2)${WHITE} 🚀 Quantum Server Management                                    ${GREEN}[NEW]${NC}${PINK}          ║${NC}"
-echo -e "${PINK}║  ${TEAL}3)${WHITE} 🔒 Zero-Trust Security Suite                                    ${GREEN}[NEW]${NC}${PINK}          ║${NC}"
-echo -e "${PINK}║  ${TEAL}4)${WHITE} 📊 Real-time Analytics Dashboard                                ${GREEN}[NEW]${NC}${PINK}          ║${NC}"
-echo -e "${PINK}║  ${TEAL}5)${WHITE} 🤖 Auto-Scaling Infrastructure                                  ${GREEN}[NEW]${NC}${PINK}          ║${NC}"
-echo -e "${PINK}║  ${TEAL}6)${WHITE} 🌐 Web3 Integration Tools                                       ${GREEN}[NEW]${NC}${PINK}          ║${NC}"
-echo -e "${PINK}║  ${TEAL}7)${WHITE} 🧠 Neural Network Monitoring                                    ${GREEN}[NEW]${NC}${PINK}          ║${NC}"
-echo -e "${PINK}║  ${TEAL}8)${WHITE} ⚡ Edge Computing Setup                                         ${GREEN}[NEW]${NC}${PINK}          ║${NC}"
-echo -e "${PINK}║  ${TEAL}9)${WHITE} 🎯 Back to Main Menu                                                     ║${NC}"
-echo -e "${PINK}║                                                                                        ║${NC}"
-echo -e "${PINK}╚════════════════════════════════════════════════════════════════════════════════════════╝${NC}"
-echo -e ""
-echo -e "${ORANGE}Select your futuristic option: ${NC}"
-read -p "→ " f2026
-
-case $f2026 in
-1) 
-    echo -e "${GREEN}Initializing AI-Powered Panel Optimizer...${NC}"
-    echo -e "${CYAN}This feature uses machine learning to optimize panel performance${NC}"
-    # Placeholder for AI optimizer
-    bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/2026/ai-optimizer.sh 2>/dev/null) || echo -e "${YELLOW}Feature coming soon!${NC}"
-    pause
-    ;;
-2)
-    echo -e "${GREEN}Launching Quantum Server Management...${NC}"
-    echo -e "${CYAN}Advanced quantum computing resource management${NC}"
-    # Placeholder for quantum management
-    echo -e "${PURPLE}Quantum algorithms loaded...${NC}"
-    pause
-    ;;
-3)
-    echo -e "${GREEN}Activating Zero-Trust Security Suite...${NC}"
-    echo -e "${CYAN}Implementing latest security protocols${NC}"
-    bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/2026/zero-trust.sh 2>/dev/null) || echo -e "${YELLOW}Security suite loading...${NC}"
-    pause
-    ;;
-4)
-    echo -e "${GREEN}Opening Real-time Analytics Dashboard...${NC}"
-    echo -e "${CYAN}Live monitoring and predictive analytics${NC}"
-    # Placeholder for analytics
-    echo -e "${BLUE}Analytics dashboard initialized${NC}"
-    pause
-    ;;
-5)
-    echo -e "${GREEN}Configuring Auto-Scaling Infrastructure...${NC}"
-    echo -e "${CYAN}Intelligent resource scaling based on demand${NC}"
-    bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/2026/auto-scale.sh 2>/dev/null) || echo -e "${YELLOW}Auto-scaling module preparing...${NC}"
-    pause
-    ;;
-6)
-    echo -e "${GREEN}Loading Web3 Integration Tools...${NC}"
-    echo -e "${CYAN}Blockchain and decentralized web tools${NC}"
-    # Placeholder for Web3 tools
-    echo -e "${TEAL}Connecting to decentralized network...${NC}"
-    pause
-    ;;
-7)
-    echo -e "${GREEN}Starting Neural Network Monitoring...${NC}"
-    echo -e "${CYAN}AI/ML workload monitoring and optimization${NC}"
-    # Placeholder for neural monitoring
-    echo -e "${PINK}Neural network analysis active${NC}"
-    pause
-    ;;
-8)
-    echo -e "${GREEN}Setting up Edge Computing...${NC}"
-    echo -e "${CYAN}Distributed edge network configuration${NC}"
-    bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/2026/edge-compute.sh 2>/dev/null) || echo -e "${YELLOW}Edge computing setup in progress...${NC}"
-    pause
-    ;;
-9) break ;;
-*) echo -e "${RED}Invalid futuristic option!${NC}"; pause ;;
-esac
-done
-}
-
-# ===================== MODERN PANEL MENU 2026 =====================
-panel_menu_2026(){
-while true; do banner_2026
-echo -e "${TEAL}╔════════════════════════════════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${TEAL}║                              🎯 ADVANCED PANEL SYSTEMS 2026 🎯                           ║${NC}"
-echo -e "${TEAL}╠════════════════════════════════════════════════════════════════════════════════════════╣${NC}"
-echo -e "${TEAL}║                                                                                        ║${NC}"
-echo -e "${TEAL}║  ${ORANGE}1)${WHITE} 🪶 FeatherPanel Pro                                        ${GREEN}[UPDATED]${NC}${TEAL}          ║${NC}"
-echo -e "${TEAL}║  ${ORANGE}2)${WHITE} 🦅 Pterodactyl AI Edition                                 ${GREEN}[ENHANCED]${NC}${TEAL}          ║${NC}"
-echo -e "${TEAL}║  ${ORANGE}3)${WHITE} ⚡ Jexactyl v5 (2026)                                     ${GREEN}[LATEST]${NC}${TEAL}            ║${NC}"
-echo -e "${TEAL}║  ${ORANGE}4)${WHITE} 🚀 Jexpanel v5                                           ${GREEN}[NEW]${NC}${TEAL}               ║${NC}"
-echo -e "${TEAL}║  ${ORANGE}5)${WHITE} 📊 Dashboard v5 (AI-Powered)                            ${GREEN}[NEW]${NC}${TEAL}               ║${NC}"
-echo -e "${TEAL}║  ${ORANGE}6)${WHITE} 💳 Smart Payment Gateway 2026                            ${GREEN}[UPDATED]${NC}${TEAL}          ║${NC}"
-echo -e "${TEAL}║  ${ORANGE}7)${WHITE} 🎮 CtrlPanel Next-Gen                                    ${GREEN}[ENHANCED]${NC}${TEAL}          ║${NC}"
-echo -e "${TEAL}║  ${ORANGE}8)${WHITE} 🌐 CPanel 2026                                           ${GREEN}[LATEST]${NC}${TEAL}            ║${NC}"
-echo -e "${TEAL}║  ${ORANGE}9)${WHITE} 🔧 Panel Factory (Custom Build)                                   ${TEAL}          ║${NC}"
-echo -e "${TEAL}║  ${ORANGE}10)${WHITE} 🛠️ Tools Panel 2026                                            ${TEAL}          ║${NC}"
-echo -e "${TEAL}║  ${ORANGE}11)${WHITE} ⬅️ Back to Future                                               ${TEAL}          ║${NC}"
-echo -e "${TEAL}║                                                                                        ║${NC}"
-echo -e "${TEAL}╚════════════════════════════════════════════════════════════════════════════════════════╝${NC}"
-echo -e ""
-echo -e "${PINK}Enter your selection: ${NC}"
-read -p "→ " p2026
-
-case $p2026 in
-1) curl -sSL https://get.featherpanel.com/2026.sh | bash || echo -e "${YELLOW}Using fallback installer${NC}"; curl -sSL https://get.featherpanel.com/beta.sh | bash ;;
-2) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/2026/pterodactyl-ai.sh 2>/dev/null) || bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/Uninstall/unPterodactyl.sh) ;;
-3) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/2026/jexactyl-v5.sh 2>/dev/null) || bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/panel/Jexactyl.sh) ;;
-4) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/2026/jexpanel-v5.sh 2>/dev/null) || bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/Uninstall/unJexactyl.sh) ;;
-5) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/2026/dashboard-v5.sh 2>/dev/null) || bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/Uninstall/dash-v4.sh) ;;
-6) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/2026/payment-2026.sh 2>/dev/null) || bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/Uninstall/unPaymenter.sh) ;;
-7) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/2026/ctrlpanel-next.sh 2>/dev/null) || bash <(curl -s https://raw.githubusercontent.com/nobita54/-150/main/Uninstall/unCtrlPanel.sh) ;;
-8) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/2026/cpanel-2026.sh 2>/dev/null) || echo -e "${YELLOW}CPanel 2026 installer coming soon${NC}"; pause ;;
-9) echo -e "${GREEN}Launching Panel Factory...${NC}"; bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/2026/panel-factory.sh 2>/dev/null) || echo -e "${CYAN}Custom panel builder${NC}"; pause ;;
-10) echo -e "${GREEN}Opening Tools Panel 2026...${NC}"; bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/2026/tools-panel.sh 2>/dev/null) || echo -e "${YELLOW}External Panel Tools loading...${NC}"; pause ;;
-11) break ;;
-*) echo -e "${RED}Invalid selection!${NC}"; pause ;;
-esac
-done
-}
-
-# ===================== ADVANCED TOOLS MENU 2026 =====================
-tools_menu_2026(){
-while true; do banner_2026
-echo -e "${BLUE}╔════════════════════════════════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║                              ⚙️ QUANTUM TOOLS SUITE 2026 ⚙️                            ║${NC}"
-echo -e "${BLUE}╠════════════════════════════════════════════════════════════════════════════════════════╣${NC}"
-echo -e "${BLUE}║                                                                                        ║${NC}"
-echo -e "${BLUE}║  ${CYAN}1)${WHITE} 🔓 Quantum Root Access                                      ${GREEN}[ENHANCED]${NC}${BLUE}          ║${NC}"
-echo -e "${BLUE}║  ${CYAN}2)${WHITE} 🌐 Neural Network VPN (Tailscale Pro)                       ${GREEN}[UPDATED]${NC}${BLUE}          ║${NC}"
-echo -e "${BLUE}║  ${CYAN}3)${WHITE} 🛡️ AI-Enhanced Cloudflare DNS                              ${GREEN}[NEW]${NC}${BLUE}               ║${NC}"
-echo -e "${BLUE}║  ${CYAN}4)${WHITE} 📈 Predictive System Analytics                              ${GREEN}[NEW]${NC}${BLUE}               ║${NC}"
-echo -e "${BLUE}║  ${CYAN}5)${WHITE} 🚀 VPS Hyper-Optimizer                                      ${GREEN}[ENHANCED]${NC}${BLUE}          ║${NC}"
-echo -e "${BLUE}║  ${CYAN}6)${WHITE} 🔄 Smart Port Orchestrator                                  ${GREEN}[NEW]${NC}${BLUE}               ║${NC}"
-echo -e "${BLUE}║  ${CYAN}7)${WHITE} 💻 Holographic RDP Installer                                ${GREEN}[UPDATED]${NC}${BLUE}          ║${NC}"
-echo -e "${BLUE}║  ${CYAN}8)${WHITE} 🧩 Container Genesis Engine                                 ${GREEN}[NEW]${NC}${BLUE}               ║${NC}"
-echo -e "${BLUE}║  ${CYAN}9)${WHITE} 🔐 Zero-Day Security Patcher                                ${GREEN}[NEW]${NC}${BLUE}               ║${NC}"
-echo -e "${BLUE}║  ${CYAN}10)${WHITE} ⬅️ Return to Main Nexus                                           ${BLUE}          ║${NC}"
-echo -e "${BLUE}║                                                                                        ║${NC}"
-echo -e "${BLUE}╚════════════════════════════════════════════════════════════════════════════════════════╝${NC}"
-echo -e ""
-echo -e "${ORANGE}Select quantum tool: ${NC}"
-read -p "→ " t2026
-
-case $t2026 in
-1) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/2026/quantum-root.sh 2>/dev/null) || bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/tools/root.sh) ;;
-2) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/2026/tailscale-pro.sh 2>/dev/null) || bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/tools/Tailscale.sh) ;;
-3) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/2026/ai-cloudflare.sh 2>/dev/null) || bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/tools/cloudflare.sh) ;;
-4) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/2026/predictive-analytics.sh 2>/dev/null) || bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/tools/SYSTEM.sh) ;;
-5) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/2026/vps-hyper.sh 2>/dev/null) || bash <(curl -s https://raw.githubusercontent.com/nobita54/-150/main/tools/vps.sh) ;;
-6) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/2026/port-orchestrator.sh 2>/dev/null) || echo -e "${YELLOW}Smart Port Orchestrator loading...${NC}"; pause ;;
-7) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/2026/holographic-rdp.sh 2>/dev/null) || bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/tools/rdp.sh) ;;
-8) echo -e "${GREEN}Initializing Container Genesis Engine...${NC}"; echo -e "${CYAN}Advanced container management system${NC}"; pause ;;
-9) echo -e "${GREEN}Activating Zero-Day Security Patcher...${NC}"; echo -e "${CYAN}Automated security vulnerability patching${NC}"; pause ;;
-10) break ;;
-*) echo -e "${RED}Invalid tool selection!${NC}"; pause ;;
-esac
-done
-}
-
-# ===================== NEO-THEME MENU 2026 =====================
-theme_menu_2026(){
-while true; do banner_2026
-echo -e "${PURPLE}╔════════════════════════════════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${PURPLE}║                              🌌 NEO-THEME SYSTEM 2026 🌌                             ║${NC}"
-echo -e "${PURPLE}╠════════════════════════════════════════════════════════════════════════════════════════╣${NC}"
-echo -e "${PURPLE}║                                                                                        ║${NC}"
-echo -e "${PURPLE}║  ${PINK}1)${WHITE} 🎨 Cyberpunk 2077 Theme                                      ${GREEN}[TRENDING]${NC}${PURPLE}         ║${NC}"
-echo -e "${PURPLE}║  ${PINK}2)${WHITE} 🌃 Neon Genesis Theme                                        ${GREEN}[POPULAR]${NC}${PURPLE}          ║${NC}"
-echo -e "${PURPLE}║  ${PINK}3)${WHITE} 🚀 Holographic UI Pack                                       ${GREEN}[NEW]${NC}${PURPLE}               ║${NC}"
-echo -e "${PURPLE}║  ${PINK}4)${WHITE} 🎮 Retro-Future Theme                                        ${GREEN}[CLASSIC]${NC}${PURPLE}          ║${NC}"
-echo -e "${PURPLE}║  ${PINK}5)${WHITE} 🌊 Oceanic Interface                                         ${GREEN}[CALM]${NC}${PURPLE}              ║${NC}"
-echo -e "${PURPLE}║  ${PINK}6)${WHITE} 🔥 Inferno Dark Mode                                         ${GREEN}[DARK]${NC}${PURPLE}              ║${NC}"
-echo -e "${PURPLE}║  ${PINK}7)${WHITE} 🌀 Morphing Theme Engine                                     ${GREEN}[ADVANCED]${NC}${PURPLE}         ║${NC}"
-echo -e "${PURPLE}║  ${PINK}8)${WHITE} ⚡ Instant Theme Switcher                                            ${PURPLE}          ║${NC}"
-echo -e "${PURPLE}║  ${PINK}9)${WHITE} 🧹 Theme Purge System                                               ${PURPLE}          ║${NC}"
-echo -e "${PURPLE}║  ${PINK}10)${WHITE} ⬅️ Back to Reality                                                 ${PURPLE}          ║${NC}"
-echo -e "${PURPLE}║                                                                                        ║${NC}"
-echo -e "${PURPLE}╚════════════════════════════════════════════════════════════════════════════════════════╝${NC}"
-echo -e ""
-echo -e "${TEAL}Choose your visual dimension: ${NC}"
-read -p "→ " th2026
-
-case $th2026 in
-1) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/2026/cyberpunk-theme.sh 2>/dev/null) || bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/thame/ch.sh) ;;
-2) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/2026/neon-theme.sh 2>/dev/null) || bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/thame/chang.sh) ;;
-3) echo -e "${GREEN}Installing Holographic UI Pack...${NC}"; echo -e "${CYAN}3D holographic interface elements${NC}"; pause ;;
-4) echo -e "${GREEN}Applying Retro-Future Theme...${NC}"; echo -e "${CYAN}80s retro with futuristic elements${NC}"; pause ;;
-5) echo -e "${GREEN}Loading Oceanic Interface...${NC}"; echo -e "${CYAN}Calm blue ocean-inspired theme${NC}"; pause ;;
-6) echo -e "${GREEN}Activating Inferno Dark Mode...${NC}"; echo -e "${CYAN}Deep dark theme with red accents${NC}"; pause ;;
-7) echo -e "${GREEN}Starting Morphing Theme Engine...${NC}"; echo -e "${CYAN}AI-powered adaptive themes${NC}"; pause ;;
-8) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/2026/theme-switcher.sh 2>/dev/null) || echo -e "${YELLOW}Theme switcher loading...${NC}"; pause ;;
-9) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/2026/theme-purge.sh 2>/dev/null) || echo -e "${YELLOW}Theme uninstall system${NC}"; pause ;;
-10) break ;;
-*) echo -e "${RED}Invalid theme selection!${NC}"; pause ;;
-esac
-done
-}
-
-# ===================== MAIN MENU 2026 =====================
-main_menu_2026(){
-while true; do banner_2026
-echo -e "${ORANGE}╔════════════════════════════════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${ORANGE}║                             🚀 CODING HUB CONTROL NEXUS 2026 🚀                         ║${NC}"
-echo -e "${ORANGE}╠════════════════════════════════════════════════════════════════════════════════════════╣${NC}"
-echo -e "${ORANGE}║                                                                                        ║${NC}"
-echo -e "${ORANGE}║  ${GREEN}1)${WHITE} 🌟 2026 Exclusive Features                                 ${blink}${RED}[HOT]${NC}${ORANGE}               ║${NC}"
-echo -e "${ORANGE}║  ${GREEN}2)${WHITE} 🚀 VPS Quantum Accelerator                                        ${ORANGE}          ║${NC}"
-echo -e "${ORANGE}║  ${GREEN}3)${WHITE} 🎯 Advanced Panel Systems                                         ${ORANGE}          ║${NC}"
-echo -e "${ORANGE}║  ${GREEN}4)${WHITE} 🦅 Wings AI Edition                                               ${ORANGE}          ║${NC}"
-echo -e "${ORANGE}║  ${GREEN}5)${WHITE} ⚙️ Quantum Tools Suite                                            ${ORANGE}          ║${NC}"
-echo -e "${ORANGE}║  ${GREEN}6)${WHITE} 🌌 Neo-Theme System                                              ${ORANGE}          ║${NC}"
-echo -e "${ORANGE}║  ${GREEN}7)${WHITE} 📊 System Nexus 2026                                             ${ORANGE}          ║${NC}"
-echo -e "${ORANGE}║  ${GREEN}8)${WHITE} 🔗 External Quantum Links                                        ${ORANGE}          ║${NC}"
-echo -e "${ORANGE}║  ${GREEN}9)${WHITE} ⚡ Switch to Legacy Mode (Pre-2026)                               ${ORANGE}          ║${NC}"
-echo -e "${ORANGE}║  ${GREEN}0)${WHITE} 🚪 Exit to Reality                                                ${ORANGE}          ║${NC}"
-echo -e "${ORANGE}║                                                                                        ║${NC}"
-echo -e "${ORANGE}║  ${CYAN}══════════════════════════════════════════════════════════════════════════════${NC}${ORANGE}║${NC}"
-echo -e "${ORANGE}║  ${YELLOW}💡 Tip: Access AI Assistant with 'ai' or 'help' command${NC}${ORANGE}                           ║${NC}"
-echo -e "${ORANGE}╚════════════════════════════════════════════════════════════════════════════════════════╝${NC}"
-echo -e ""
-echo -e "${PINK}Enter your command: ${NC}"
-read -p "→ " c2026
-
-case $c2026 in
-1) features_2026_menu ;;
-2) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/2026/vps-quantum.sh 2>/dev/null) || bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/vm/vps.sh) ;;
-3) panel_menu_2026 ;;
-4) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/2026/wings-ai.sh 2>/dev/null) || bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/wings/www.sh) ;;
-5) tools_menu_2026 ;;
-6) theme_menu_2026 ;;
-7) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/2026/system-nexus.sh 2>/dev/null) || bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/menu/System1.sh) ;;
-8) echo -e "${GREEN}Opening External Quantum Links...${NC}"; echo -e "${CYAN}Connecting to external resources...${NC}"; pause ;;
-9) 
-    echo -e "${YELLOW}Switching to Legacy Mode...${NC}"
-    echo -e "${CYAN}Loading pre-2026 interface${NC}"
-    sleep 2
-    main_menu
-    ;;
-0) 
-    echo -e "${GREEN}"
-    echo "╔════════════════════════════════════════╗"
-    echo "║                                        ║"
-    echo "║   Thank you for using CODING HUB 2026  ║"
-    echo "║                                        ║"
-    echo "║           See you in the future!       ║"
-    echo "║                                        ║"
-    echo "╚════════════════════════════════════════╝"
-    echo -e "${NC}"
-    exit 0
-    ;;
-ai|help|AI)
-    echo -e "${CYAN}"
-    echo "╔════════════════════════════════════════════════════════════════════════════════════════╗"
-    echo "║                                  🤖 AI ASSISTANT 2026                                 ║"
-    echo "╠════════════════════════════════════════════════════════════════════════════════════════╣"
-    echo "║                                                                                        ║"
-    echo "║  Available commands:                                                                   ║"
-    echo "║  • '1-9' - Menu options                                                                ║"
-    echo "║  • 'legacy' - Switch to old interface                                                 ║"
-    echo "║  • 'update' - Check for updates                                                       ║"
-    echo "║  • 'status' - System status                                                           ║"
-    echo "║  • 'credits' - Show credits                                                           ║"
-    echo "║                                                                                        ║"
-    echo "║  New in 2026:                                                                          ║"
-    echo "║  • AI-powered optimization                                                            ║"
-    echo "║  • Quantum computing tools                                                            ║"
-    echo "║  • Neural network monitoring                                                          ║"
-    echo "║  • Zero-trust security                                                                ║"
-    echo "║                                                                                        ║"
-    echo "╚════════════════════════════════════════════════════════════════════════════════════════╝"
-    echo -e "${NC}"
-    pause
-    ;;
-update)
-    echo -e "${GREEN}Checking for 2026 updates...${NC}"
-    bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/2026/updater.sh 2>/dev/null) || echo -e "${YELLOW}Update system coming soon${NC}"
-    pause
-    ;;
-status)
-    echo -e "${CYAN}System Status:${NC}"
-    echo -e "${GREEN}• CODING HUB 2026 Edition${NC}"
-    echo -e "${GREEN}• Version: 2026.1.0${NC}"
-    echo -e "${GREEN}• AI Features: Active${NC}"
-    echo -e "${GREEN}• Quantum Tools: Ready${NC}"
-    pause
-    ;;
-credits)
-    echo -e "${PURPLE}"
-    echo "╔════════════════════════════════════════════════════════════════════════════════════════╗"
-    echo "║                                   CREDITS 2026                                        ║"
-    echo "╠════════════════════════════════════════════════════════════════════════════════════════╣"
-    echo "║                                                                                        ║"
-    echo "║  Created by: Nobita                                                                    ║"
-    echo "║  Special Thanks:                                                                       ║"
-    echo "║  • The Coding Hub Community                                                           ║"
-    echo "║  • Open Source Contributors                                                           ║"
-    echo "║  • AI Development Team                                                                ║"
-    echo "║                                                                                        ║"
-    echo "║  © 2026 CODING HUB - All Systems Go                                                   ║"
-    echo "║                                                                                        ║"
-    echo "╚════════════════════════════════════════════════════════════════════════════════════════╝"
-    echo -e "${NC}"
-    pause
-    ;;
-*)
-    # Check if input is a number for backward compatibility
-    if [[ "$c2026" =~ ^[0-9]+$ ]]; then
-        echo -e "${RED}Invalid option! Please choose 0-9 or type 'help'${NC}"
-    else
-        echo -e "${YELLOW}Unknown command. Type 'help' for assistance.${NC}"
-    fi
-    pause
-    ;;
-esac
-done
-}
-
-# ===================== LEGACY PANEL MENU =====================
-panel_menu(){
+# ===================== EXTERNAL MENU =====================
+external_menu(){
 while true; do banner
-echo -e "${GREEN}────────────── PANEL MENU ──────────────${NC}"
-echo -e "${YELLOW} 1)${WHITE} FeatherPanel"
-echo -e "${YELLOW} 2)${WHITE} Pterodactyl"
-echo -e "${YELLOW} 3)${WHITE} Jexactyl v3"
-echo -e "${YELLOW} 4)${WHITE} Jexpanel v4"
-echo -e "${YELLOW} 5)${WHITE} Dashboard v3"
-echo -e "${YELLOW} 6)${WHITE} Dashboard v4"
-echo -e "${YELLOW} 7)${WHITE} Payment Gateway"
-echo -e "${YELLOW} 8)${WHITE} CtrlPanel"
-echo -e "${YELLOW} 9)${WHITE} CPanel"
-echo -e "${YELLOW}10)${WHITE} Tools Panel (External)"
-echo -e "${YELLOW}11)${WHITE} Back"
-echo -e "${GREEN}─────────────────────────────────────────${NC}"
-read -p "Select → " p
-
-case $p in
-1) curl -sSL https://get.featherpanel.com/beta.sh | bash ;;
-2) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/Uninstall/unPterodactyl.sh) ;;
-3) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/panel/Jexactyl.sh) ;;
-4) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/Uninstall/unJexactyl.sh) ;;
-5) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/Uninstall/undash-3.sh) ;;
-6) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/Uninstall/dash-v4.sh) ;;
-7) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/Uninstall/unPaymenter.sh) ;;
-8) bash <(curl -s https://raw.githubusercontent.com/nobita54/-150/main/Uninstall/unCtrlPanel.sh) ;;
-9) echo "CPanel installer not linked yet"; pause ;;
-10) echo "External Panel Tools coming soon"; pause ;;
-11) break ;;
-*) echo -e "${RED}Invalid Option${NC}"; pause ;;
+hr
+ln "🌐 EXTERNAL MENU"
+ln ""
+ln "1) External Tool 1"
+ln "2) External Tool 2"
+ln "3) External Tool 3"
+ln "4) Back"
+fr
+read -p "Select → " e
+case $e in
+1) echo "External Tool 1 placeholder"; pause ;;
+2) echo "External Tool 2 placeholder"; pause ;;
+3) echo "External Tool 3 placeholder"; pause ;;
+4) break ;;
+*) echo -e "${C4}Invalid option${NC}"; pause ;;
 esac
 done
 }
 
-# ===================== LEGACY TOOLS MENU =====================
+# ===================== TOOLS MENU =====================
 tools_menu(){
 while true; do banner
-echo -e "${BLUE}────────────── TOOLS MENU ──────────────${NC}"
-echo -e "${YELLOW} 1)${WHITE} Root Access"
-echo -e "${YELLOW} 2)${WHITE} Tailscale"
-echo -e "${YELLOW} 3)${WHITE} Cloudflare DNS"
-echo -e "${YELLOW} 4)${WHITE} System Info"
-echo -e "${YELLOW} 5)${WHITE} Vps Run"
-echo -e "${YELLOW} 6)${WHITE} Port Forward"
-echo -e "${YELLOW} 7)${WHITE} RDP Installer"
-echo -e "${YELLOW} 8)${WHITE} Back"
-echo -e "${BLUE}────────────────────────────────────────${NC}"
+hr
+ln "🧰 TOOLS MENU"
+ln ""
+ln "1) Root Access"
+ln "2) Tailscale"
+ln "3) Cloudflare DNS"
+ln "4) System Info"
+ln "5) VPS Run"
+ln "6) RDP Installer"
+ln "7) Back"
+fr
 read -p "Select → " t
-
 case $t in
 1) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/tools/root.sh) ;;
 2) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/tools/Tailscale.sh) ;;
 3) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/tools/cloudflare.sh) ;;
 4) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/tools/SYSTEM.sh) ;;
 5) bash <(curl -s https://raw.githubusercontent.com/nobita54/-150/main/tools/vps.sh) ;;
-6) echo "Port Forward script not linked"; pause ;;
-7) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/tools/rdp.sh) ;;
-8) break ;;
-*) echo -e "${RED}Invalid${NC}"; pause ;;
+6) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/tools/rdp.sh) ;;
+7) break ;;
+*) echo -e "${C4}Invalid option${NC}"; pause ;;
 esac
 done
 }
 
-# ===================== LEGACY THEME MENU =====================
-theme_menu(){
+# ===================== PANEL MENU =====================
+panel_menu(){
 while true; do banner
-echo -e "${PURPLE}────────────── THEME MENU ──────────────${NC}"
-echo -e "${YELLOW} 1)${WHITE} Blueprint Theme"
-echo -e "${YELLOW} 2)${WHITE} Change Theme"
-echo -e "${YELLOW} 3)${WHITE} Uninstall Theme"
-echo -e "${YELLOW} 4)${WHITE} Back"
-echo -e "${PURPLE}────────────────────────────────────────${NC}"
-read -p "Select → " th
-
-case $th in
-1) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/thame/ch.sh) ;;
-2) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/thame/chang.sh) ;;
-3) echo "Theme uninstall not linked"; pause ;;
-4) break ;;
-*) echo -e "${RED}Invalid${NC}"; pause ;;
+hr
+ln "🧩 PANEL MENU"
+ln ""
+ln "1) FeatherPanel"
+ln "2) Pterodactyl"
+ln "3) Jexactyl"
+ln "4) Dashboard"
+ln "5) Back"
+fr
+read -p "Select → " p
+case $p in
+1) curl -sSL https://get.featherpanel.com/beta.sh | bash ;;
+2) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/Uninstall/unPterodactyl.sh) ;;
+3) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/panel/Jexactyl.sh) ;;
+4) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/Uninstall/undash-3.sh) ;;
+5) break ;;
+*) echo -e "${C4}Invalid option${NC}"; pause ;;
 esac
 done
 }
 
-# ===================== LEGACY EXTERNAL MENU =====================
-external_menu(){
-while true; do banner
-echo -e "${CYAN}────────────── EXTERNAL MENU ──────────────${NC}"
-echo -e "${YELLOW} 1)${WHITE} External Tool 1"
-echo -e "${YELLOW} 2)${WHITE} External Tool 2"
-echo -e "${YELLOW} 3)${WHITE} External Tool 3"
-echo -e "${YELLOW} 4)${WHITE} Back"
-echo -e "${CYAN}─────────────────────────────────────────${NC}"
-read -p "Select → " e
-
-case $e in
-1) echo "External Tool 1 placeholder"; pause ;;
-2) echo "External Tool 2 placeholder"; pause ;;
-3) echo "External Tool 3 placeholder"; pause ;;
-4) break ;;
-*) echo -e "${RED}Invalid${NC}"; pause ;;
-esac
-done
-}
-
-# ===================== LEGACY MAIN MENU =====================
+# ===================== MAIN MENU =====================
 main_menu(){
 while true; do banner
-echo -e "${CYAN}────────────── MAIN MENU ──────────────${NC}"
-echo -e "${YELLOW} 1)${WHITE} Vps Run"
-echo -e "${YELLOW} 2)${WHITE} Panel"
-echo -e "${YELLOW} 3)${WHITE} Wings"
-echo -e "${YELLOW} 4)${WHITE} Tools"
-echo -e "${YELLOW} 5)${WHITE} Theme"
-echo -e "${YELLOW} 6)${WHITE} System"
-echo -e "${YELLOW} 7)${WHITE} External"
-echo -e "${YELLOW} 8)${WHITE} Switch to 2026 Mode"
-echo -e "${YELLOW} 9)${WHITE} Exit"
-echo -e "${CYAN}──────────────────────────────────────${NC}"
+hr
+ln "🏠 MAIN MENU"
+ln ""
+ln "1) VPS Run"
+ln "2) Panel"
+ln "3) Wings"
+ln "4) Tools"
+ln "5) System"
+ln "6) External"
+ln "7) Exit"
+fr
 read -p "Select → " c
-
 case $c in
 1) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/vm/vps.sh) ;;
 2) panel_menu ;;
 3) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/wings/www.sh) ;;
 4) tools_menu ;;
-5) theme_menu ;;
-6) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/menu/System1.sh) ;;
-7) external_menu ;;
-8) 
-    echo -e "${GREEN}Switching to 2026 Mode...${NC}"
-    echo -e "${CYAN}Welcome to the future!${NC}"
-    sleep 2
-    main_menu_2026
-    ;;
-9) echo -e "${GREEN}Exiting — CODING HUB by Nobita${NC}"; exit ;;
-*) echo -e "${RED}Invalid${NC}"; pause ;;
+5) bash <(curl -s https://raw.githubusercontent.com/nobita329/The-Coding-Hub/main/srv/menu/System1.sh) ;;
+6) external_menu ;;
+7) echo -e "${C3}Bye 👋 CODING HUB by Nobita${NC}"; exit ;;
+*) echo -e "${C4}Invalid option${NC}"; pause ;;
 esac
 done
 }
 
-# ===================== INITIALIZATION =====================
-# Check if user wants to start in 2026 mode
-if [[ "$1" == "2026" ]] || [[ "$1" == "future" ]] || [[ "$1" == "next" ]]; then
-    main_menu_2026
-else
-    # Show initial choice
-    clear
-    echo -e "${TEAL}╔════════════════════════════════════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${TEAL}║                                                                                        ║${NC}"
-    echo -e "${TEAL}║  ${ORANGE}╔══════════════════════════════════════════════════════════════════════════════╗${NC}${TEAL}║${NC}"
-    echo -e "${TEAL}║  ${ORANGE}║              🎌 CHOOSE YOUR INTERFACE DIMENSION 🎌                         ║${NC}${TEAL}║${NC}"
-    echo -e "${TEAL}║  ${ORANGE}╚══════════════════════════════════════════════════════════════════════════════╝${NC}${TEAL}║${NC}"
-    echo -e "${TEAL}║                                                                                        ║${NC}"
-    echo -e "${TEAL}║                                                                                        ║${NC}"
-    echo -e "${TEAL}║  ${GREEN}[1]${WHITE} 🚀 Launch CODING HUB 2026 (Future Mode)                           ${TEAL}          ║${NC}"
-    echo -e "${TEAL}║  ${GREEN}[2]${WHITE} ⚡ Launch Legacy System (Classic Mode)                             ${TEAL}          ║${NC}"
-    echo -e "${TEAL}║  ${GREEN}[3]${WHITE} ❓ Show Information                                               ${TEAL}          ║${NC}"
-    echo -e "${TEAL}║  ${GREEN}[4]${WHITE} 🚪 Exit                                                           ${TEAL}          ║${NC}"
-    echo -e "${TEAL}║                                                                                        ║${NC}"
-    echo -e "${TEAL}║                                                                                        ║${NC}"
-    echo -e "${TEAL}╚════════════════════════════════════════════════════════════════════════════════════════╝${NC}"
-    echo -e ""
-    echo -e "${PINK}Choose your launch mode: ${NC}"
-    read -p "→ " launch_mode
-    
-    case $launch_mode in
-        1) main_menu_2026 ;;
-        2) main_menu ;;
-        3)
-            echo -e "${CYAN}"
-            echo "CODING HUB Control Panel"
-            echo "========================="
-            echo "2026 Edition Features:"
-            echo "• Modern futuristic UI"
-            echo "• AI-powered tools"
-            echo "• Quantum computing options"
-            echo "• Enhanced security"
-            echo "• Legacy mode compatible"
-            echo ""
-            echo "Created by: Nobita"
-            echo -e "${NC}"
-            pause
-            main_menu
-            ;;
-        4) echo -e "${GREEN}Goodbye!${NC}"; exit 0 ;;
-        *) main_menu ;;
-    esac
-fi
+main_menu
