@@ -5,6 +5,27 @@
 # Version: 3.0 - Auto Image Detection
 # ============================================
 
+
+# if you use Ubuntu
+
+sudo apt update && sudo apt upgrade -y
+sudo apt install lxc lxc-utils -y
+sudo apt install snapd -y
+sudo systemctl enable --now snapd.socket
+sudo snap install lxd
+sudo usermod -aG lxd $USER
+newgrp lxd
+sudo lxd init
+sudo apt update
+sudo apt install lxc lxc-utils bridge-utils uidmap -y
+# if you use debain 
+sudo apt install snapd -y
+sudo systemctl enable --now snapd.socket
+sudo ln -s /var/lib/snapd/snap /snap
+sudo snap install lxd
+sudo usermod -aG lxd $USER
+newgrp lxd
+sudo lxd init
 # Color codes for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
